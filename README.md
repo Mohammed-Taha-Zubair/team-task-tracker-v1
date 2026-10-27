@@ -107,46 +107,50 @@ TEAM-TASK-Manager/
    - [frontend/app/page.js](frontend/app/page.js): Redirects automatically to `/dashboard`.
    - [frontend/app/login/page.js](frontend/app/login/page.js): Tailwind sign-in form with error alerts, redirects to `/dashboard` on success (or if already logged in).
    - [frontend/app/register/page.js](frontend/app/register/page.js): Registration form with name, email, password, and role selector (`Admin` / `Member`).
-   - [frontend/app/dashboard/page.js](frontend/app/dashboard/page.js): Dashboard placeholder wrapped in `ProtectedPage`.
+   - [frontend/app/dashboard/page.js](frontend/app/dashboard/page.js): Dashboard with teams and admin team creation.
 
 ---
 
-## How to Test Phase 3 by Hand
+## Phase 4: Dashboard and Team View with Live Timeline
 
-### 1. Ensure Backend is Running
-```bash
-cd backend
-source venv/bin/activate
-python manage.py runserver 8000
-```
+### What Was Built
+1. **Interactive Dashboard ([frontend/app/dashboard/page.js](frontend/app/dashboard/page.js))**:
+   - Fetches and displays all user teams as cards (`name`, `description`, and `member_count`), with clickable links to `/teams/[id]`.
+   - Admin-only "Create Team" form that calls `POST /api/teams/` and instantly updates the teams grid.
+   - Friendly empty-state illustrations tailored for admin vs member roles.
 
-### 2. Start Next.js Frontend
-```bash
-cd frontend
-npm run dev -- -p 3000
-```
-Open your browser at `http://localhost:3000`.
+2. **Team View Workspace ([frontend/app/teams/[id]/page.js](frontend/app/teams/[id]/page.js))**:
+   - Responsive two-column layout on desktop, stacked on mobile.
+   - **Left Column**:
+     - Team header with description and total member count.
+     - Members roster showing names and role badges (`admin` vs `member`).
+     - Admin-only "Invite Member" form calling `POST /api/teams/<id>/invite/` with real-time feedback and automatic roster refresh.
+     - **Task List ([frontend/components/TaskList.js](frontend/components/TaskList.js))**: Filter tabs for `All`, `Pending`, `In Progress`, and `Done`, colored status badges, assignee tags, and links to `/teams/<id>/tasks/<taskId>`.
+     - **New Task Form ([frontend/components/NewTaskForm.js](frontend/components/NewTaskForm.js))**: Form with title, description, team member assignee dropdown, and status selector. Calls `POST /api/teams/<id>/tasks/`.
+   - **Right Column**:
+     - **Live Activity Timeline ([frontend/components/Timeline.js](frontend/components/Timeline.js))**: Polling every 5 seconds via `setInterval` (with cleanup), displaying human-readable relative timestamps (`2 min ago`, `just now`) via [frontend/lib/utils.js](frontend/lib/utils.js).
 
-### 3. Verification Steps
-1. **Redirect on Root**:
-   - Visit `http://localhost:3000/`. You should be redirected to `/dashboard`, which immediately redirects you to `http://localhost:3000/login` because you are unauthenticated.
-2. **Register a New Account**:
-   - On the login page, click **"Create an account"** (or go to `http://localhost:3000/register`).
-   - Fill in:
-     - Name: `Sarah Admin`
-     - Email: `sarah@example.com`
-     - Password: `Password123!`
-     - Role: `Admin`
-   - Click **"Sign Up"**.
-   - You should be automatically logged in and redirected to `http://localhost:3000/dashboard`.
-3. **Verify Dashboard & Navbar**:
-   - The top navigation bar appears displaying `Sarah Admin`, the role badge `ADMIN`, and the **Logout** button.
-   - The dashboard greeting shows `"Welcome, Sarah Admin!"`.
-4. **Test Session Restoration on Page Reload**:
-   - Hit **Refresh** (F5 / Ctrl+R) on `http://localhost:3000/dashboard`.
-   - Notice you briefly see `"Loading..."` while the background token refresh occurs, and then you remain on the dashboard without losing your session.
-5. **Test Protected Route Guard**:
-   - Click **Logout**.
-   - You are redirected to `/login`, and the Navbar disappears.
-   - Try manually entering `http://localhost:3000/dashboard` in the address bar.
-   - You are prevented from accessing it and immediately bounced back to `/login`.
+---
+
+## How to Test Phase 4 by Hand
+
+1. **Start backend and frontend**:
+   - Backend: `cd backend && ./venv/bin/python manage.py runserver 8000`
+   - Frontend: `cd frontend && npm run dev`
+2. **Open browser at `http://localhost:3000`**:
+   - Login as an admin (e.g. `sarah@example.com`).
+3. **Create a Team**:
+   - On the dashboard, fill in the "Create a New Team" form (e.g., `Engineering Alpha`).
+   - Click **Create Team**. The team card appears immediately.
+4. **Enter Team Workspace**:
+   - Click the team card to navigate to `/teams/<team_id>`.
+   - Notice the two-column view with Team Header, Members, and Timeline on the right.
+5. **Invite a Member**:
+   - Enter another registered email in the "Invite Member" form.
+   - Click **Invite Member**. The member badge appears in the members roster, and an activity entry is logged in the timeline.
+6. **Create a Task**:
+   - Click **+ New Task**, enter a title, description, select an assignee from the dropdown, and click **Create Task**.
+   - The task appears in the task list and the timeline updates with a creation log.
+7. **Filter Tasks**:
+   - Click the filter tabs (`Pending`, `In Progress`, `Done`) to filter tasks by status.
+
