@@ -7,7 +7,7 @@ A full-stack Team Task Tracker built with a Django + MongoDB backend and Next.js
 ## Tech Stack
 
 - **Backend**: Django, Django REST Framework (DRF), MongoDB via `mongoengine`, custom JWT auth (`PyJWT`).
-- **Frontend**: Next.js (App Router), TailwindCSS, JavaScript (Client-side).
+- **Frontend**: Next.js (App Router), TailwindCSS, JavaScript (Client-side only, no TypeScript, no server actions).
 - **Database**: MongoDB (no Django ORM used for application data).
 
 ---
@@ -23,13 +23,9 @@ TEAM-TASK-Manager/
 │   ├── manage.py               # Django management script
 │   ├── api.http                # Sample REST API requests for manual testing
 │   ├── config/
-│   │   ├── __init__.py
 │   │   ├── settings.py         # Stripped Django settings (MongoDB, JWT, CORS)
-│   │   ├── urls.py             # Top-level API routing (/api/)
-│   │   ├── wsgi.py
-│   │   └── asgi.py
+│   │   └── urls.py             # Top-level API routing (/api/)
 │   └── api/
-│       ├── __init__.py
 │       ├── models.py           # MongoEngine documents (User, Team, Task, Comment, Activity)
 │       ├── auth.py             # JWTAuth authentication & IsAdmin permissions
 │       ├── utils.py            # log_activity and get_team_or_error helpers
@@ -38,7 +34,24 @@ TEAM-TASK-Manager/
 │       ├── views_teams.py      # Teams endpoints (Create, List, Detail, Invite)
 │       ├── views_tasks.py      # Tasks, Comments, and Activity endpoints
 │       └── urls.py             # API URL routes
-├── frontend/                   # Next.js frontend (Coming in upcoming phases)
+├── frontend/
+│   ├── .env.local.example      # Frontend environment variables template
+│   ├── .env.local              # Local Next.js config (NEXT_PUBLIC_API_URL)
+│   ├── package.json
+│   ├── lib/
+│   │   └── api.js              # Fetch wrapper with in-memory token & 401 retry
+│   ├── context/
+│   │   └── AuthContext.js      # Global auth state, session restore, login/register/logout
+│   ├── components/
+│   │   ├── Navbar.js           # Navigation bar with user name, role, and logout
+│   │   └── ProtectedPage.js    # Route guard wrapper with loading & login redirect
+│   └── app/
+│       ├── layout.js           # Root layout wrapping AuthProvider & Navbar
+│       ├── globals.css         # TailwindCSS styles
+│       ├── page.js             # Redirects to /dashboard
+│       ├── login/page.js       # Login form with error alerts
+│       ├── register/page.js    # Register form (name, email, password, role)
+│       └── dashboard/page.js   # Protected dashboard placeholder
 ├── .gitignore
 └── README.md
 ```
@@ -46,7 +59,6 @@ TEAM-TASK-Manager/
 ---
 
 ## Phase 1: Backend Setup, Models, and Authentication
-
 - **Database Models (`api/models.py`)**: `User`, `Team`, `Task`, `Comment`, `Activity` with `to_dict()`.
 - **Custom JWT (`api/auth.py`)**: 15m access tokens, 7d refresh tokens, `JWTAuth`, `IsAdmin`.
 - **Auth Endpoints (`api/views_auth.py`)**: `POST /api/auth/register/`, `POST /api/auth/login/`, `POST /api/auth/refresh/`, `GET /api/auth/me/`.
@@ -54,94 +66,87 @@ TEAM-TASK-Manager/
 ---
 
 ## Phase 2: Teams, Tasks, Comments, and Activity APIs
-
-### What Was Built
-1. **Helper Functions ([backend/api/utils.py](backend/api/utils.py))**:
-   - `log_activity(team, user, message, task=None)`: Creates and persists an `Activity` record.
-   - `get_team_or_error(team_id, user)`: Validates ObjectId format and team existence (returns 404 if invalid/missing) and checks if the user is in `team.members` (returns 403 if not).
-
-2. **Teams Endpoints ([backend/api/views_teams.py](backend/api/views_teams.py))**:
-   - `POST /api/teams/` (admin only): Creates a new team, automatically adds creator to `members`, logs activity `<name> created team "<team name>"`, returns team with `member_count`.
-   - `GET /api/teams/`: Lists only teams where the logged-in user is a member, including `member_count`.
-   - `GET /api/teams/<id>/`: Members only. Returns team with full member profiles (id, name, email, role).
-   - `POST /api/teams/<id>/invite/`: Admin only AND must be a member of that team. Validates `{email}`:
-     - Prints `"Invitation sent to <email>"` in server console.
-     - If user exists: adds to `team.members` (no duplicates) and logs activity.
-     - If user does not exist: returns 400 with `{"message": "User must register first"}`.
-
-3. **Tasks Endpoints ([backend/api/views_tasks.py](backend/api/views_tasks.py))**:
-   - `POST /api/teams/<id>/tasks/`: Members only. Creates task with `title`, `description`, optional `assigned_to` (must be a team member), and `status`. Logs `<name> created task "<title>"`.
-   - `GET /api/teams/<id>/tasks/?status=pending`: Lists team tasks (optional status filter: pending, in_progress, done), newest updated first. Formats `assigned_to` as `{id, name}`.
-   - `GET /api/tasks/<id>/`: Members only. Returns task details.
-   - `PATCH /api/tasks/<id>/`: Members only. Updates title, description, assigned_to, and status. Updates `updated_at`.
-     - If status changed, logs exactly `<name> changed status of "<title>" to <Pending / In Progress / Done>.`
-     - Otherwise logs `<name> updated task "<title>"`.
-
-4. **Comments Endpoints ([backend/api/views_tasks.py](backend/api/views_tasks.py))**:
-   - `GET /api/tasks/<id>/comments/`: Oldest first, includes author `{id, name, email}`.
-   - `POST /api/tasks/<id>/comments/`: Adds comment `{text}`, logs `<name> commented on "<title>"`.
-
-5. **Activity Log Endpoint ([backend/api/views_tasks.py](backend/api/views_tasks.py))**:
-   - `GET /api/teams/<id>/activity/`: Team members only, newest first, includes author details.
+- **Teams (`api/views_teams.py`)**: Create (admin only), list member teams, get team details, invite members by email.
+- **Tasks (`api/views_tasks.py`)**: Create task, list team tasks with status filter, get task, update task (triggers status log).
+- **Comments (`api/views_tasks.py`)**: List comments oldest-first, post comments with author tracking.
+- **Activity (`api/views_tasks.py`)**: Full reverse-chronological timeline of actions.
 
 ---
 
-## How to Test Phase 2 by Hand
+## Phase 3: Next.js Setup and Authentication
 
-### Option A: Using `backend/api.http` (REST Client)
-Open [backend/api.http](backend/api.http) and execute requests step-by-step:
-1. Run **1.3 Login Admin** to acquire `@accessToken`.
-2. Run **2.1 Create a Team** to create a team and store `@teamId`.
-3. Run **2.4 Invite Member to Team** with `{"email": "bob@example.com"}`.
-4. Run **3.1 Create Task in Team** to create a task and store `@taskId`.
-5. Run **3.5 Update Task Status** to change status to `in_progress`.
-6. Run **4.1 Add Comment to Task** to post a comment.
-7. Run **5.1 View Team Activity Timeline** to observe all logged actions.
+### What Was Built
+1. **API Client ([frontend/lib/api.js](frontend/lib/api.js))**:
+   - Stores the short-lived access token in memory (`inMemoryAccessToken`).
+   - Automatically attaches `Authorization: Bearer <token>` to requests.
+   - If a request returns `401 Unauthorized`:
+     - Reads the `refreshToken` from `localStorage`.
+     - Calls `POST /api/auth/refresh/` exactly **once**.
+     - Updates the in-memory access token and transparently retries the failed request.
+     - If the refresh token is expired or invalid, it purges `localStorage` and routes the user to `/login`.
+   - Accesses `localStorage` strictly inside functions to eliminate Next.js server-side rendering errors.
+   - Exports helpers: `api.get`, `api.post`, `api.patch`.
 
-### Option B: Using `curl`
+2. **Authentication Context ([frontend/context/AuthContext.js](frontend/context/AuthContext.js))**:
+   - Manages global `user` and `loading` states.
+   - On initial load: automatically restores the user session by exchanging `refreshToken` from `localStorage` for a fresh access token, then fetching `GET /api/auth/me/`.
+   - `login(email, password)`: Sets token and user state.
+   - `register(name, email, password, role)`: Registers the user and auto-logs them in.
+   - `logout()`: Clears memory, removes tokens from `localStorage`, and redirects to `/login`.
 
-**1. Create a Team (Admin Only)**:
+3. **Navbar ([frontend/components/Navbar.js](frontend/components/Navbar.js))**:
+   - Visible only when a user is logged in.
+   - Shows brand title, current user name, role badge (`admin` or `member`), and a `Logout` button.
+
+4. **Protected Page Wrapper ([frontend/components/ProtectedPage.js](frontend/components/ProtectedPage.js))**:
+   - Shows a clean `"Loading..."` state while session restoration is pending.
+   - If unauthenticated, smoothly redirects the visitor to `/login`.
+   - Renders child content when authenticated.
+
+5. **Pages**:
+   - [frontend/app/page.js](frontend/app/page.js): Redirects automatically to `/dashboard`.
+   - [frontend/app/login/page.js](frontend/app/login/page.js): Tailwind sign-in form with error alerts, redirects to `/dashboard` on success (or if already logged in).
+   - [frontend/app/register/page.js](frontend/app/register/page.js): Registration form with name, email, password, and role selector (`Admin` / `Member`).
+   - [frontend/app/dashboard/page.js](frontend/app/dashboard/page.js): Dashboard placeholder wrapped in `ProtectedPage`.
+
+---
+
+## How to Test Phase 3 by Hand
+
+### 1. Ensure Backend is Running
 ```bash
-curl -X POST http://localhost:8000/api/teams/ \
-  -H "Authorization: Bearer <ADMIN_TOKEN>" \
-  -H "Content-Type: application/json" \
-  -d '{"name": "Engineering Alpha", "description": "Core dev team"}'
+cd backend
+source venv/bin/activate
+python manage.py runserver 8000
 ```
 
-**2. Invite Member to Team**:
+### 2. Start Next.js Frontend
 ```bash
-curl -X POST http://localhost:8000/api/teams/<TEAM_ID>/invite/ \
-  -H "Authorization: Bearer <ADMIN_TOKEN>" \
-  -H "Content-Type: application/json" \
-  -d '{"email": "bob@example.com"}'
+cd frontend
+npm run dev -- -p 3000
 ```
+Open your browser at `http://localhost:3000`.
 
-**3. Create Task**:
-```bash
-curl -X POST http://localhost:8000/api/teams/<TEAM_ID>/tasks/ \
-  -H "Authorization: Bearer <MEMBER_OR_ADMIN_TOKEN>" \
-  -H "Content-Type: application/json" \
-  -d '{"title": "Implement Navigation", "description": "Add navbar with tabs", "status": "pending"}'
-```
-
-**4. Update Task Status**:
-```bash
-curl -X PATCH http://localhost:8000/api/tasks/<TASK_ID>/ \
-  -H "Authorization: Bearer <TOKEN>" \
-  -H "Content-Type: application/json" \
-  -d '{"status": "in_progress"}'
-```
-
-**5. Add Comment**:
-```bash
-curl -X POST http://localhost:8000/api/tasks/<TASK_ID>/comments/ \
-  -H "Authorization: Bearer <TOKEN>" \
-  -H "Content-Type: application/json" \
-  -d '{"text": "Design approved, working on it."}'
-```
-
-**6. View Team Activity**:
-```bash
-curl -X GET http://localhost:8000/api/teams/<TEAM_ID>/activity/ \
-  -H "Authorization: Bearer <TOKEN>"
-```
+### 3. Verification Steps
+1. **Redirect on Root**:
+   - Visit `http://localhost:3000/`. You should be redirected to `/dashboard`, which immediately redirects you to `http://localhost:3000/login` because you are unauthenticated.
+2. **Register a New Account**:
+   - On the login page, click **"Create an account"** (or go to `http://localhost:3000/register`).
+   - Fill in:
+     - Name: `Sarah Admin`
+     - Email: `sarah@example.com`
+     - Password: `Password123!`
+     - Role: `Admin`
+   - Click **"Sign Up"**.
+   - You should be automatically logged in and redirected to `http://localhost:3000/dashboard`.
+3. **Verify Dashboard & Navbar**:
+   - The top navigation bar appears displaying `Sarah Admin`, the role badge `ADMIN`, and the **Logout** button.
+   - The dashboard greeting shows `"Welcome, Sarah Admin!"`.
+4. **Test Session Restoration on Page Reload**:
+   - Hit **Refresh** (F5 / Ctrl+R) on `http://localhost:3000/dashboard`.
+   - Notice you briefly see `"Loading..."` while the background token refresh occurs, and then you remain on the dashboard without losing your session.
+5. **Test Protected Route Guard**:
+   - Click **Logout**.
+   - You are redirected to `/login`, and the Navbar disappears.
+   - Try manually entering `http://localhost:3000/dashboard` in the address bar.
+   - You are prevented from accessing it and immediately bounced back to `/login`.
