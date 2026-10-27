@@ -25,6 +25,7 @@ const clearAuthAndRedirect = () => {
   if (typeof window !== "undefined") {
     localStorage.removeItem("refreshToken");
     if (window.location.pathname !== "/login") {
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
       window.location.href = "/login";
     }
   }
@@ -55,7 +56,12 @@ const request = async (endpoint, options = {}, isRetry = false) => {
   }
 
   // Handle 401 Unauthorized by attempting to refresh the access token once
-  if (response.status === 401 && !isRetry) {
+  if (
+    response.status === 401 &&
+    !isRetry &&
+    !endpoint.includes("/api/auth/refresh/") &&
+    !endpoint.includes("/api/auth/login/")
+  ) {
     const refreshToken = getRefreshToken();
 
     // If no refresh token exists, redirect to login
