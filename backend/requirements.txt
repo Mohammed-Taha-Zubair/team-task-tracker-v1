@@ -1,0 +1,6 @@
+django>=5.0
+djangorestframework>=3.15.0
+django-cors-headers>=4.3.0
+mongoengine>=0.28.0
+PyJWT>=2.8.0
+python-dotenv>=1.0.0
