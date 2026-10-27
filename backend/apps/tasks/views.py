@@ -4,8 +4,10 @@ from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.exceptions import NotFound
-from .models import Task, Comment, Activity, User
-from .utils import log_activity, get_team_or_error
+from apps.tasks.models import Task, Comment
+from apps.users.models import User
+from apps.common.utils import get_team_or_error
+from apps.activity.services import log_activity
 
 
 # Helper to format a Task object with assigned_to as {id, name}
@@ -34,7 +36,6 @@ def get_task_and_team_or_error(task_id, user):
     if not task:
         raise NotFound("Task not found")
 
-    # Verify user is a member of the team this task belongs to
     team = get_team_or_error(str(task.team.id), user)
     return task, team
 
@@ -93,7 +94,6 @@ class TeamTaskListCreateView(APIView):
         )
         task.save()
 
-        # Log activity
         log_activity(
             team=team,
             user=request.user,
@@ -113,7 +113,6 @@ class TeamTaskListCreateView(APIView):
             if status_filter in ["pending", "in_progress", "done"]:
                 query["status"] = status_filter
 
-        # Order by newest updated first
         tasks = Task.objects(**query).order_by("-updated_at")
 
         return Response(
@@ -183,7 +182,6 @@ class TaskDetailView(APIView):
         task.updated_at = datetime.utcnow()
         task.save()
 
-        # Log activity: exact status message format if status changed, otherwise general update log
         status_labels = {
             "pending": "Pending",
             "in_progress": "In Progress",
@@ -211,7 +209,6 @@ class TaskCommentsView(APIView):
     def get(self, request, id):
         task, team = get_task_and_team_or_error(id, request.user)
 
-        # Oldest first
         comments = Comment.objects(task=task).order_by("created_at")
 
         data = []
@@ -247,7 +244,6 @@ class TaskCommentsView(APIView):
         )
         comment.save()
 
-        # Log activity
         log_activity(
             team=team,
             user=request.user,
@@ -268,28 +264,3 @@ class TaskCommentsView(APIView):
             },
             status=status.HTTP_201_CREATED,
         )
-
-
-# GET /api/teams/<id>/activity/ : List team activity log (newest first, includes user name)
-class TeamActivityView(APIView):
-    def get(self, request, id):
-        team = get_team_or_error(id, request.user)
-
-        # Newest first
-        activities = Activity.objects(team=team).order_by("-created_at")
-
-        data = []
-        for act in activities:
-            data.append({
-                "id": str(act.id),
-                "team_id": str(team.id),
-                "message": act.message,
-                "task_id": str(act.task.id) if act.task else None,
-                "user": {
-                    "id": str(act.user.id),
-                    "name": act.user.name,
-                } if act.user else None,
-                "created_at": act.created_at.isoformat() if act.created_at else None,
-            })
-
-        return Response(data, status=status.HTTP_200_OK)

@@ -51,19 +51,6 @@ export const AuthProvider = ({ children }) => {
     return data;
   };
 
-  // Register: register user account then automatically log in
-  const register = async (name, email, password, role) => {
-    const data = await api.post("/api/auth/register/", {
-      name,
-      email,
-      password,
-      role,
-    });
-    // Auto-login upon registration for seamless onboarding
-    await login(email, password);
-    return data;
-  };
-
   // Logout: clears storage, memory tokens, and routes to /login
   const logout = () => {
     localStorage.removeItem("refreshToken");
@@ -73,7 +60,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

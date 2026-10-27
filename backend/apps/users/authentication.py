@@ -2,9 +2,8 @@ from datetime import datetime, timedelta, timezone
 import jwt
 from django.conf import settings
 from rest_framework.authentication import BaseAuthentication
-from rest_framework.permissions import BasePermission
 from rest_framework.exceptions import AuthenticationFailed
-from .models import User
+from apps.users.models import User
 
 # Generate access token valid for 15 minutes
 def generate_access_token(user):
@@ -33,16 +32,14 @@ class JWTAuth(BaseAuthentication):
     def authenticate(self, request):
         auth_header = request.headers.get("Authorization")
         if not auth_header or not auth_header.startswith("Bearer "):
-            return None  # Let DRF handle unauthenticated or public views
+            return None
 
-        # Extract token string from "Bearer <token>"
         parts = auth_header.split(" ")
         if len(parts) != 2:
             raise AuthenticationFailed("Invalid token")
 
         token = parts[1].strip()
 
-        # Verify access token using JWT_ACCESS_SECRET
         try:
             payload = jwt.decode(
                 token,
@@ -58,7 +55,6 @@ class JWTAuth(BaseAuthentication):
         if not user_id:
             raise AuthenticationFailed("Invalid token")
 
-        # Load user from MongoDB
         try:
             user = User.objects.get(id=user_id)
         except Exception:
@@ -66,18 +62,5 @@ class JWTAuth(BaseAuthentication):
 
         return (user, None)
 
-    # DRF requires authenticate_header to return a string so 401 (not 403) is sent
     def authenticate_header(self, request):
         return "Bearer"
-
-
-# Custom Permission: allows only users with role "admin"
-class IsAdmin(BasePermission):
-    message = "Admin access required"
-
-    def has_permission(self, request, view):
-        return bool(
-            request.user
-            and getattr(request.user, "is_authenticated", False)
-            and getattr(request.user, "role", None) == "admin"
-        )

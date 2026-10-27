@@ -1,8 +1,10 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import Link from "next/link";
 import ProtectedPage from "@/components/ProtectedPage";
+import CreateTeamForm from "@/components/CreateTeamForm";
+import TeamCard from "@/components/TeamCard";
+import UserManagement from "@/components/UserManagement";
 import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/api";
 
@@ -11,12 +13,6 @@ export default function DashboardPage() {
   const [teams, setTeams] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-
-  // Create team state (Admin only)
-  const [teamName, setTeamName] = useState("");
-  const [teamDescription, setTeamDescription] = useState("");
-  const [creating, setCreating] = useState(false);
-  const [createError, setCreateError] = useState("");
 
   const fetchTeams = useCallback(async () => {
     try {
@@ -52,32 +48,6 @@ export default function DashboardPage() {
     };
   }, []);
 
-  const handleCreateTeam = async (e) => {
-    e.preventDefault();
-    if (!teamName.trim()) {
-      setCreateError("Team name is required");
-      return;
-    }
-
-    setCreating(true);
-    setCreateError("");
-
-    try {
-      await api.post("/api/teams/", {
-        name: teamName.trim(),
-        description: teamDescription.trim(),
-      });
-
-      setTeamName("");
-      setTeamDescription("");
-      await fetchTeams();
-    } catch (err) {
-      setCreateError(err?.message || "Failed to create team");
-    } finally {
-      setCreating(false);
-    }
-  };
-
   return (
     <ProtectedPage>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -106,68 +76,12 @@ export default function DashboardPage() {
 
         {/* Admin Only: Create Team Form */}
         {user?.role === "admin" && (
-          <div className="mb-10 bg-white rounded-xl shadow-xs border border-slate-200/90 p-6">
-            <div className="flex items-center space-x-2.5 mb-4">
-              <div className="w-7 h-7 rounded-lg bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center">
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                </svg>
-              </div>
-              <div>
-                <h2 className="text-sm font-bold text-slate-900">Create a New Team</h2>
-                <p className="text-xs text-slate-500">
-                  Organize projects and assign tasks by creating dedicated team spaces.
-                </p>
-              </div>
-            </div>
+          <CreateTeamForm onTeamCreated={fetchTeams} />
+        )}
 
-            {createError && (
-              <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-xs font-medium">
-                {createError}
-              </div>
-            )}
-
-            <form onSubmit={handleCreateTeam} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                    Team Name <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={teamName}
-                    onChange={(e) => setTeamName(e.target.value)}
-                    placeholder="e.g. Design Systems, Platform Core"
-                    className="w-full px-3.5 py-2.5 bg-white text-slate-900 border border-slate-300 rounded-lg text-sm shadow-2xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition placeholder:text-slate-400"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                    Description
-                  </label>
-                  <input
-                    type="text"
-                    value={teamDescription}
-                    onChange={(e) => setTeamDescription(e.target.value)}
-                    placeholder="Brief description of the team's mission"
-                    className="w-full px-3.5 py-2.5 bg-white text-slate-900 border border-slate-300 rounded-lg text-sm shadow-2xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition placeholder:text-slate-400"
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end pt-1">
-                <button
-                  type="submit"
-                  disabled={creating}
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white text-xs font-semibold rounded-lg shadow-xs transition disabled:opacity-50 cursor-pointer"
-                >
-                  {creating ? "Creating Team..." : "Create Team"}
-                </button>
-              </div>
-            </form>
-          </div>
+        {/* Admin Only: User Management */}
+        {user?.role === "admin" && (
+          <UserManagement currentUserId={user?.id} />
         )}
 
         {/* Teams List */}
@@ -213,32 +127,7 @@ export default function DashboardPage() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
               {teams.map((team) => (
-                <Link
-                  key={team.id}
-                  href={`/teams/${team.id}`}
-                  className="group block bg-white rounded-xl border border-slate-200/90 shadow-2xs hover:shadow-xs hover:border-indigo-300 transition-all p-5"
-                >
-                  <div className="flex items-start justify-between">
-                    <h3 className="text-sm font-bold text-slate-900 group-hover:text-indigo-600 transition truncate">
-                      {team.name}
-                    </h3>
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-600 border border-slate-200/60 shrink-0 ml-2">
-                      {team.member_count || (team.members ? team.members.length : 1)}{" "}
-                      {(team.member_count || (team.members ? team.members.length : 1)) === 1
-                        ? "member"
-                        : "members"}
-                    </span>
-                  </div>
-
-                  <p className="mt-2 text-xs text-slate-500 line-clamp-2 min-h-[2rem]">
-                    {team.description || "No description provided for this team."}
-                  </p>
-
-                  <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-indigo-600 font-semibold group-hover:translate-x-0.5 transition-transform">
-                    <span>View Workspace</span>
-                    <span aria-hidden="true">&rarr;</span>
-                  </div>
-                </Link>
+                <TeamCard key={team.id} team={team} />
               ))}
             </div>
           )}

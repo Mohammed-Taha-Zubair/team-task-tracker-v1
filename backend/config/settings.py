@@ -14,11 +14,15 @@ SECRET_KEY = os.getenv("SECRET_KEY", "default-dev-secret-key")
 DEBUG = os.getenv("DEBUG", "True").lower() == "true"
 ALLOWED_HOSTS = ["*"]
 
-# Application definition: only rest_framework, corsheaders, and our api app
+# Application definition: rest_framework, corsheaders, and feature apps
 INSTALLED_APPS = [
     "corsheaders",
     "rest_framework",
-    "api",
+    "apps.common",
+    "apps.users",
+    "apps.teams",
+    "apps.tasks",
+    "apps.activity",
 ]
 
 # Minimal middleware without sessions, auth, or messages
@@ -60,10 +64,10 @@ CORS_ALLOWED_ORIGINS = [
 
 # Django REST Framework configuration
 REST_FRAMEWORK = {
-    "DEFAULT_AUTHENTICATION_CLASSES": ["api.auth.JWTAuth"],
+    "DEFAULT_AUTHENTICATION_CLASSES": ["apps.users.authentication.JWTAuth"],
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
     "UNAUTHENTICATED_USER": None,
-    "EXCEPTION_HANDLER": "api.exceptions.custom_exception_handler",
+    "EXCEPTION_HANDLER": "apps.common.exceptions.custom_exception_handler",
 }
 
 # JWT secrets read from environment

@@ -99,13 +99,7 @@ export default function LoginPage() {
         </form>
 
         <div className="mt-6 text-center text-xs text-slate-500">
-          Don&apos;t have an account?{" "}
-          <Link
-            href="/register"
-            className="text-indigo-600 hover:text-indigo-700 font-semibold hover:underline"
-          >
-            Create an account
-          </Link>
+          Access is provided by your administrator. Contact your admin to get credentials.
         </div>
       </div>
     </div>

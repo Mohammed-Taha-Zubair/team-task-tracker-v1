@@ -107,9 +107,13 @@ const request = async (endpoint, options = {}, isRetry = false) => {
     data = await response.text();
   }
 
-  // Handle non-2xx responses by throwing error payload
+  // Handle non-2xx responses by throwing error payload (with status attached)
   if (!response.ok) {
-    throw data || { message: `Request failed with status ${response.status}` };
+    const err = typeof data === "object" && data !== null
+      ? data
+      : { message: `Request failed with status ${response.status}` };
+    err.status = response.status;
+    throw err;
   }
 
   return data;
@@ -130,4 +134,6 @@ export const api = {
       method: "PATCH",
       body: body ? JSON.stringify(body) : undefined,
     }),
+  delete: (endpoint, options = {}) => request(endpoint, { ...options, method: "DELETE" }),
 };
+
