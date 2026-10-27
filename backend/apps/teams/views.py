@@ -10,7 +10,7 @@ from apps.activity.services import log_activity
 # GET /api/teams/: List all teams where the authenticated user is a member
 class TeamListCreateView(APIView):
     def post(self, request):
-        if getattr(request.user, "role", None) != "admin":
+        if not getattr(request.user, "is_admin_or_superadmin", False):
             return Response(
                 {"message": "Admin access required"},
                 status=status.HTTP_403_FORBIDDEN,
@@ -37,21 +37,22 @@ class TeamListCreateView(APIView):
             team=team,
             user=request.user,
             message=f'{request.user.name} created team "{team.name}"',
+            action_type="team_created",
         )
 
         team_dict = team.to_dict()
-        team_dict["member_count"] = len(team.members)
-
         return Response(team_dict, status=status.HTTP_201_CREATED)
 
     def get(self, request):
-        teams = Team.objects(members=request.user).order_by("-created_at")
+        # Superadmin can view all teams; Admins and Members view joined teams
+        if getattr(request.user, "is_superadmin", False):
+            teams = Team.objects.all().order_by("-created_at")
+        else:
+            teams = Team.objects(members=request.user).order_by("-created_at")
 
         data = []
         for team in teams:
-            team_dict = team.to_dict()
-            team_dict["member_count"] = len(team.members)
-            data.append(team_dict)
+            data.append(team.to_dict())
 
         return Response(data, status=status.HTTP_200_OK)
 
@@ -60,11 +61,7 @@ class TeamListCreateView(APIView):
 class TeamDetailView(APIView):
     def get(self, request, id):
         team = get_team_or_error(id, request.user)
-
-        team_dict = team.to_dict()
-        team_dict["member_count"] = len(team.members)
-
-        return Response(team_dict, status=status.HTTP_200_OK)
+        return Response(team.to_dict(), status=status.HTTP_200_OK)
 
 
 # POST /api/teams/<id>/invite/: Invite a user by email to join the team
@@ -72,7 +69,7 @@ class TeamInviteView(APIView):
     def post(self, request, id):
         team = get_team_or_error(id, request.user)
 
-        if getattr(request.user, "role", None) != "admin":
+        if not getattr(request.user, "is_admin_or_superadmin", False):
             return Response(
                 {"message": "Admin access required"},
                 status=status.HTTP_403_FORBIDDEN,
@@ -85,38 +82,42 @@ class TeamInviteView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        print(f"Invitation sent to {email}")
-
         invited_user = User.objects(email=email).first()
         if not invited_user:
             return Response(
-                {"message": "User not found. Please create this member in User Management first."},
+                {"message": "User not found. Please register this member first."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        already_member = any(
-            str(m.id) == str(invited_user.id)
-            for m in team.members
-            if m
-        )
+        already_member = False
+        for m in (team.members or []):
+            try:
+                if m and str(getattr(m, "id", None)) == str(invited_user.id):
+                    already_member = True
+                    break
+            except Exception:
+                continue
 
-        if not already_member:
-            team.members.append(invited_user)
-            team.save()
-
-            log_activity(
-                team=team,
-                user=request.user,
-                message=f'{request.user.name} added {invited_user.name} to team "{team.name}"',
+        if already_member:
+            return Response(
+                {"message": "User is already a member of this team"},
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
-        team_dict = team.to_dict()
-        team_dict["member_count"] = len(team.members)
+        team.members.append(invited_user)
+        team.save()
+
+        log_activity(
+            team=team,
+            user=request.user,
+            message=f'{request.user.name} added {invited_user.name} to team "{team.name}"',
+            action_type="member_added",
+        )
 
         return Response(
             {
                 "message": f"{invited_user.name} added to team",
-                "team": team_dict,
+                "team": team.to_dict(),
             },
             status=status.HTTP_200_OK,
         )

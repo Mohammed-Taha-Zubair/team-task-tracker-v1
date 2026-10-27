@@ -10,10 +10,13 @@ from mongoengine import (
 class User(Document):
     meta = {"collection": "users"}
 
+    ROLE_CHOICES = ("SUPERADMIN", "ADMIN", "MEMBER")
+
     name = StringField(required=True, max_length=100)
     email = EmailField(required=True, unique=True)
     password = StringField(required=True)
-    role = StringField(choices=["admin", "member"], default="member")
+    # Include legacy lowercase choices so existing records load without ValidationError
+    role = StringField(choices=["SUPERADMIN", "ADMIN", "MEMBER", "admin", "member"], default="MEMBER")
     created_at = DateTimeField(default=datetime.utcnow)
 
     # Required by DRF's authentication mechanism
@@ -21,12 +24,24 @@ class User(Document):
     def is_authenticated(self):
         return True
 
+    @property
+    def is_superadmin(self):
+        return (self.role or "").upper() == "SUPERADMIN"
+
+    @property
+    def is_admin_or_superadmin(self):
+        return (self.role or "").upper() in ["ADMIN", "SUPERADMIN"]
+
+    @property
+    def is_member(self):
+        return (self.role or "").upper() == "MEMBER"
+
     # Convert document to plain Python dictionary (never exposes password)
     def to_dict(self):
         return {
             "id": str(self.id),
             "name": self.name,
             "email": self.email,
-            "role": self.role,
+            "role": (self.role or "MEMBER").upper(),
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }

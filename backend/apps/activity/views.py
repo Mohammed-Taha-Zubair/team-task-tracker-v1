@@ -13,15 +13,30 @@ class TeamActivityView(APIView):
 
         data = []
         for act in activities:
+            user_data = None
+            try:
+                if act.user and hasattr(act.user, "id"):
+                    user_data = {
+                        "id": str(act.user.id),
+                        "name": getattr(act.user, "name", "Former Member"),
+                    }
+            except Exception:
+                user_data = {"id": None, "name": "Former Member"}
+
+            task_id = None
+            try:
+                if act.task and hasattr(act.task, "id"):
+                    task_id = str(act.task.id)
+            except Exception:
+                task_id = None
+
             data.append({
                 "id": str(act.id),
                 "team_id": str(team.id),
+                "action_type": getattr(act, "action_type", "activity"),
                 "message": act.message,
-                "task_id": str(act.task.id) if act.task else None,
-                "user": {
-                    "id": str(act.user.id),
-                    "name": act.user.name,
-                } if act.user else None,
+                "task_id": task_id,
+                "user": user_data,
                 "created_at": act.created_at.isoformat() if act.created_at else None,
             })
 

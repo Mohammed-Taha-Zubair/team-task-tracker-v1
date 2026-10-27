@@ -3,7 +3,10 @@
 import Link from "next/link";
 
 export default function TeamCard({ team }) {
-  const memberCount = team.member_count || (team.members ? team.members.length : 1);
+  const memberCount =
+    team?.member_count !== undefined
+      ? team.member_count
+      : (team?.members?.length ?? 0);
 
   return (
     <Link

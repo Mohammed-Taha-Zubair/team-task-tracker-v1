@@ -99,7 +99,10 @@ export default function LoginPage() {
         </form>
 
         <div className="mt-6 text-center text-xs text-slate-500">
-          Access is provided by your administrator. Contact your admin to get credentials.
+          Don&apos;t have an account?{" "}
+          <Link href="/register" className="text-indigo-600 hover:text-indigo-700 font-semibold hover:underline">
+            Register as a member
+          </Link>
         </div>
       </div>
     </div>

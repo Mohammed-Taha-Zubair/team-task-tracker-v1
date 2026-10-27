@@ -12,16 +12,41 @@ from apps.activity.services import log_activity
 
 # Helper to format a Task object with assigned_to as {id, name}
 def format_task(task):
+    assigned_to_data = None
+    try:
+        if task.assigned_to and hasattr(task.assigned_to, "id"):
+            assigned_to_data = {
+                "id": str(task.assigned_to.id),
+                "name": getattr(task.assigned_to, "name", "Former Member"),
+            }
+    except Exception:
+        assigned_to_data = None
+
+    created_by_data = None
+    try:
+        if task.created_by and hasattr(task.created_by, "id"):
+            created_by_data = {
+                "id": str(task.created_by.id),
+                "name": getattr(task.created_by, "name", "Former Member"),
+            }
+    except Exception:
+        created_by_data = None
+
+    team_id = None
+    try:
+        if task.team and hasattr(task.team, "id"):
+            team_id = str(task.team.id)
+    except Exception:
+        team_id = None
+
     return {
         "id": str(task.id),
         "title": task.title,
         "description": task.description,
-        "assigned_to": {
-            "id": str(task.assigned_to.id),
-            "name": task.assigned_to.name,
-        } if task.assigned_to else None,
+        "assigned_to": assigned_to_data,
+        "created_by": created_by_data,
         "status": task.status,
-        "team_id": str(task.team.id) if task.team else None,
+        "team_id": team_id,
         "created_at": task.created_at.isoformat() if task.created_at else None,
         "updated_at": task.updated_at.isoformat() if task.updated_at else None,
     }
@@ -71,11 +96,15 @@ class TeamTaskListCreateView(APIView):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
             assigned_user = User.objects(id=assigned_to_id).first()
-            is_team_member = any(
-                str(m.id) == str(assigned_to_id)
-                for m in team.members
-                if m
-            )
+            is_team_member = False
+            for m in (team.members or []):
+                try:
+                    if m and str(getattr(m, "id", None)) == str(assigned_to_id):
+                        is_team_member = True
+                        break
+                except Exception:
+                    continue
+
             if not assigned_user or not is_team_member:
                 return Response(
                     {"message": "Assigned user must be a team member"},
@@ -87,6 +116,7 @@ class TeamTaskListCreateView(APIView):
             title=title,
             description=description,
             assigned_to=assigned_user,
+            created_by=request.user,
             status=task_status,
             team=team,
             created_at=now,
@@ -99,6 +129,7 @@ class TeamTaskListCreateView(APIView):
             user=request.user,
             message=f'{request.user.name} created task "{task.title}"',
             task=task,
+            action_type="task_created",
         )
 
         return Response(format_task(task), status=status.HTTP_201_CREATED)
@@ -156,11 +187,15 @@ class TaskDetailView(APIView):
                         status=status.HTTP_400_BAD_REQUEST,
                     )
                 assigned_user = User.objects(id=assigned_to_id).first()
-                is_member = any(
-                    str(m.id) == str(assigned_to_id)
-                    for m in team.members
-                    if m
-                )
+                is_member = False
+                for m in (team.members or []):
+                    try:
+                        if m and str(getattr(m, "id", None)) == str(assigned_to_id):
+                            is_member = True
+                            break
+                    except Exception:
+                        continue
+
                 if not assigned_user or not is_member:
                     return Response(
                         {"message": "Assigned user must be a team member"},
@@ -190,14 +225,17 @@ class TaskDetailView(APIView):
         if status_changed:
             status_text = status_labels.get(task.status, task.status)
             message = f'{request.user.name} changed status of "{task.title}" to {status_text}.'
+            action_type = "status_changed"
         else:
             message = f'{request.user.name} updated task "{task.title}"'
+            action_type = "task_updated"
 
         log_activity(
             team=team,
             user=request.user,
             message=message,
             task=task,
+            action_type=action_type,
         )
 
         return Response(format_task(task), status=status.HTTP_200_OK)
@@ -213,15 +251,22 @@ class TaskCommentsView(APIView):
 
         data = []
         for c in comments:
+            user_data = None
+            try:
+                if c.user and hasattr(c.user, "id"):
+                    user_data = {
+                        "id": str(c.user.id),
+                        "name": getattr(c.user, "name", "Former Member"),
+                    }
+            except Exception:
+                user_data = {"id": None, "name": "Former Member"}
+
             data.append({
                 "id": str(c.id),
                 "task_id": str(task.id),
                 "text": c.text,
                 "created_at": c.created_at.isoformat() if c.created_at else None,
-                "user": {
-                    "id": str(c.user.id),
-                    "name": c.user.name,
-                } if c.user else None,
+                "user": user_data,
             })
 
         return Response(data, status=status.HTTP_200_OK)
@@ -249,6 +294,7 @@ class TaskCommentsView(APIView):
             user=request.user,
             message=f'{request.user.name} commented on "{task.title}"',
             task=task,
+            action_type="comment_added",
         )
 
         return Response(

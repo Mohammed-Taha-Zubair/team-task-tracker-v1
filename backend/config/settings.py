@@ -14,8 +14,14 @@ SECRET_KEY = os.getenv("SECRET_KEY", "default-dev-secret-key")
 DEBUG = os.getenv("DEBUG", "True").lower() == "true"
 ALLOWED_HOSTS = ["*"]
 
-# Application definition: rest_framework, corsheaders, and feature apps
+# Application definition: Django platform admin, rest_framework, corsheaders, and feature apps
 INSTALLED_APPS = [
+    "django.contrib.admin",
+    "django.contrib.auth",
+    "django.contrib.contenttypes",
+    "django.contrib.sessions",
+    "django.contrib.messages",
+    "django.contrib.staticfiles",
     "corsheaders",
     "rest_framework",
     "apps.common",
@@ -25,11 +31,15 @@ INSTALLED_APPS = [
     "apps.activity",
 ]
 
-# Minimal middleware without sessions, auth, or messages
+# Middleware supporting both CORS, security, and Django Admin sessions
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
@@ -43,6 +53,8 @@ TEMPLATES = [
         "OPTIONS": {
             "context_processors": [
                 "django.template.context_processors.request",
+                "django.contrib.auth.context_processors.auth",
+                "django.contrib.messages.context_processors.messages",
             ],
         },
     },
@@ -50,10 +62,17 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "config.wsgi.application"
 
-# No Django relational database - MongoDB is used exclusively
-DATABASES = {}
+# Lightweight SQLite database exclusively for Django's platform admin and internal framework models
+DATABASES = {
+    "default": {
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": BASE_DIR / "db.sqlite3",
+    }
+}
 
-# MongoDB connection using mongoengine
+STATIC_URL = "static/"
+
+# MongoDB connection using mongoengine for all application domain entities
 MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017/team_task_tracker")
 mongoengine.connect(host=MONGO_URI)
 

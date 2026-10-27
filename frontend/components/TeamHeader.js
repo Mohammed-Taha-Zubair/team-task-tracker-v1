@@ -64,33 +64,39 @@ export default function TeamHeader({ team, user, onTeamUpdated }) {
           Team Members
         </h3>
         <div className="flex flex-wrap gap-2">
-          {team?.members?.map((member) => (
-            <div
-              key={member.id}
-              className="inline-flex items-center space-x-2 bg-slate-50 border border-slate-200/80 px-2.5 py-1.5 rounded-lg text-xs"
-            >
-              <span className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 font-bold flex items-center justify-center text-[10px]">
-                {member.name ? member.name.charAt(0).toUpperCase() : "U"}
-              </span>
-              <span className="font-semibold text-slate-800">
-                {member.name}
-              </span>
-              <span
-                className={`text-[10px] px-1.5 py-0.5 rounded font-medium uppercase tracking-wide border ${
-                  member.role === "admin"
-                    ? "bg-purple-50 text-purple-700 border-purple-200/60"
-                    : "bg-slate-100 text-slate-600 border-slate-200/60"
-                }`}
+          {team?.members && team.members.filter(Boolean).length > 0 ? (
+            team.members.filter(Boolean).map((member) => (
+              <div
+                key={member.id || member.email}
+                className="inline-flex items-center space-x-2 bg-slate-50 border border-slate-200/80 px-2.5 py-1.5 rounded-lg text-xs"
               >
-                {member.role}
-              </span>
-            </div>
-          ))}
+                <span className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 font-bold flex items-center justify-center text-[10px]">
+                  {member.name ? member.name.charAt(0).toUpperCase() : "U"}
+                </span>
+                <span className="font-semibold text-slate-800">
+                  {member.name}
+                </span>
+                <span
+                  className={`text-[10px] px-1.5 py-0.5 rounded font-medium uppercase tracking-wide border ${
+                    (member.role || "").toUpperCase() === "SUPERADMIN"
+                      ? "bg-purple-50 text-purple-700 border-purple-200/60"
+                      : (member.role || "").toUpperCase() === "ADMIN"
+                      ? "bg-blue-50 text-blue-700 border-blue-200/60"
+                      : "bg-slate-100 text-slate-600 border-slate-200/60"
+                  }`}
+                >
+                  {(member.role || "MEMBER").toUpperCase()}
+                </span>
+              </div>
+            ))
+          ) : (
+            <p className="text-xs text-slate-400 italic">No members assigned to this team yet.</p>
+          )}
         </div>
       </div>
 
-      {/* Admin Only: Invite Member Form */}
-      {user?.role === "admin" && (
+      {/* Admin/Superadmin: Invite Member Form */}
+      {((user?.role || "").toUpperCase() === "ADMIN" || (user?.role || "").toUpperCase() === "SUPERADMIN") && (
         <div className="mt-6 pt-5 border-t border-slate-100">
           <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
             Invite Member by Email

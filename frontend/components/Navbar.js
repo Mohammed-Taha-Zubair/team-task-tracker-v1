@@ -40,12 +40,14 @@ export default function Navbar() {
               </span>
               <span
                 className={`text-[11px] px-2.5 py-0.5 rounded-full font-medium tracking-wide border ${
-                  user.role === "admin"
+                  (user.role || "").toUpperCase() === "SUPERADMIN"
                     ? "bg-purple-50 text-purple-700 border-purple-200/70"
+                    : (user.role || "").toUpperCase() === "ADMIN"
+                    ? "bg-blue-50 text-blue-700 border-blue-200/70"
                     : "bg-slate-100 text-slate-700 border-slate-200/70"
                 }`}
               >
-                {user.role}
+                {(user.role || "").toUpperCase()}
               </span>
             </div>
 

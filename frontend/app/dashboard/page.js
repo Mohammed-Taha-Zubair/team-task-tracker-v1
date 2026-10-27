@@ -48,6 +48,10 @@ export default function DashboardPage() {
     };
   }, []);
 
+  const userRole = (user?.role || "").toUpperCase();
+  const isSuperAdmin = userRole === "SUPERADMIN";
+  const isAdminOrSuperAdmin = userRole === "SUPERADMIN" || userRole === "ADMIN";
+
   return (
     <ProtectedPage>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -64,24 +68,26 @@ export default function DashboardPage() {
           <div className="flex items-center space-x-2">
             <span
               className={`text-xs px-3 py-1 rounded-full font-medium tracking-wide border ${
-                user?.role === "admin"
+                isSuperAdmin
                   ? "bg-purple-50 text-purple-700 border-purple-200/70"
+                  : userRole === "ADMIN"
+                  ? "bg-blue-50 text-blue-700 border-blue-200/70"
                   : "bg-slate-100 text-slate-700 border-slate-200/70"
               }`}
             >
-              Role: {user?.role}
+              Role: {userRole || "MEMBER"}
             </span>
           </div>
         </div>
 
-        {/* Admin Only: Create Team Form */}
-        {user?.role === "admin" && (
+        {/* Admin/Superadmin: Create Team Form */}
+        {isAdminOrSuperAdmin && (
           <CreateTeamForm onTeamCreated={fetchTeams} />
         )}
 
-        {/* Admin Only: User Management */}
-        {user?.role === "admin" && (
-          <UserManagement currentUserId={user?.id} />
+        {/* Superadmin Only: User Management */}
+        {isSuperAdmin && (
+          <UserManagement currentUserId={user?.id} onUserChanged={fetchTeams} />
         )}
 
         {/* Teams List */}
@@ -119,7 +125,7 @@ export default function DashboardPage() {
                 No teams found
               </h3>
               <p className="mt-1 text-xs text-slate-500 max-w-sm mx-auto">
-                {user?.role === "admin"
+                {isAdminOrSuperAdmin
                   ? "You haven't created any teams yet. Use the form above to create your first team!"
                   : "You are not a member of any teams yet. Ask your team admin to invite your email address."}
               </p>
