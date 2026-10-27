@@ -1,43 +1,59 @@
-### Team Task Tracker API - Phase 1 Auth Requests
+### Team Task Tracker API - Complete Requests (Phase 1 & Phase 2)
 @baseUrl = http://localhost:8000/api
 
-### 1. Register a new Admin user
+### ==========================================================================
+### 1. AUTHENTICATION ENDPOINTS
+### ==========================================================================
+
+### 1.1 Register Admin User
 POST {{baseUrl}}/auth/register/
 Content-Type: application/json
 
 {
-  "name": "Admin User",
-  "email": "admin@example.com",
+  "name": "Alice Admin",
+  "email": "alice@example.com",
   "password": "Password123!",
   "role": "admin"
 }
 
-### 2. Register a new Member user
+### 1.2 Register Member User
 POST {{baseUrl}}/auth/register/
 Content-Type: application/json
 
 {
-  "name": "Jane Member",
-  "email": "jane@example.com",
+  "name": "Bob Member",
+  "email": "bob@example.com",
   "password": "Password123!",
   "role": "member"
 }
 
-### 3. Login with registered user credentials
-# @name login
+### 1.3 Login Admin (sets @accessToken and @refreshToken)
+# @name loginAdmin
 POST {{baseUrl}}/auth/login/
 Content-Type: application/json
 
 {
-  "email": "admin@example.com",
+  "email": "alice@example.com",
   "password": "Password123!"
 }
 
-### Store tokens from login response:
-@accessToken = {{login.response.body.accessToken}}
-@refreshToken = {{login.response.body.refreshToken}}
+### Store admin tokens from login response:
+@accessToken = {{loginAdmin.response.body.accessToken}}
+@refreshToken = {{loginAdmin.response.body.refreshToken}}
 
-### 4. Refresh access token using refreshToken
+### 1.4 Login Member (for testing member permissions)
+# @name loginMember
+POST {{baseUrl}}/auth/login/
+Content-Type: application/json
+
+{
+  "email": "bob@example.com",
+  "password": "Password123!"
+}
+
+@memberToken = {{loginMember.response.body.accessToken}}
+
+### 1.5 Refresh Access Token
 POST {{baseUrl}}/auth/refresh/
 Content-Type: application/json
 
@@ -45,6 +61,120 @@ Content-Type: application/json
   "refreshToken": "{{refreshToken}}"
 }
 
-### 5. Get current authenticated user profile (GET /api/auth/me/)
+### 1.6 Get Current User Profile (GET /api/auth/me/)
 GET {{baseUrl}}/auth/me/
+Authorization: Bearer {{accessToken}}
+
+
+### ==========================================================================
+### 2. TEAMS ENDPOINTS
+### ==========================================================================
+
+### 2.1 Create a Team (Admin Only)
+# @name createTeam
+POST {{baseUrl}}/teams/
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": "Engineering Alpha",
+  "description": "Core product development team"
+}
+
+### Store created team ID
+@teamId = {{createTeam.response.body.id}}
+
+### 2.2 List User's Teams (Teams where current user is a member)
+GET {{baseUrl}}/teams/
+Authorization: Bearer {{accessToken}}
+
+### 2.3 Get Team Details (Full member list)
+GET {{baseUrl}}/teams/{{teamId}}/
+Authorization: Bearer {{accessToken}}
+
+### 2.4 Invite Member to Team (Admin + Team Member Only)
+POST {{baseUrl}}/teams/{{teamId}}/invite/
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "email": "bob@example.com"
+}
+
+
+### ==========================================================================
+### 3. TASKS ENDPOINTS
+### ==========================================================================
+
+### 3.1 Create Task in Team
+# @name createTask
+POST {{baseUrl}}/teams/{{teamId}}/tasks/
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "title": "Build Auth Flow",
+  "description": "Implement JWT login and register views",
+  "status": "pending"
+}
+
+### Store created task ID
+@taskId = {{createTask.response.body.id}}
+
+### 3.2 List Tasks of Team (Optional ?status=pending filter)
+GET {{baseUrl}}/teams/{{teamId}}/tasks/?status=pending
+Authorization: Bearer {{accessToken}}
+
+### 3.3 List All Tasks of Team (No filter)
+GET {{baseUrl}}/teams/{{teamId}}/tasks/
+Authorization: Bearer {{accessToken}}
+
+### 3.4 Get Task Details by ID
+GET {{baseUrl}}/tasks/{{taskId}}/
+Authorization: Bearer {{accessToken}}
+
+### 3.5 Update Task (Status Change logs: '<name> changed status of "<title>" to <Pending / In Progress / Done>.')
+PATCH {{baseUrl}}/tasks/{{taskId}}/
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "status": "in_progress"
+}
+
+### 3.6 Update Task Title and Description
+PATCH {{baseUrl}}/tasks/{{taskId}}/
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "title": "Build Complete Auth Flow",
+  "description": "Include refresh token handling and logout"
+}
+
+
+### ==========================================================================
+### 4. COMMENTS ENDPOINTS
+### ==========================================================================
+
+### 4.1 Add Comment to Task
+POST {{baseUrl}}/tasks/{{taskId}}/comments/
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "text": "Initial PR is up for review!"
+}
+
+### 4.2 List Comments for Task (Oldest first)
+GET {{baseUrl}}/tasks/{{taskId}}/comments/
+Authorization: Bearer {{accessToken}}
+
+
+### ==========================================================================
+### 5. ACTIVITY LOG ENDPOINTS
+### ==========================================================================
+
+### 5.1 View Team Activity Timeline (Newest first)
+GET {{baseUrl}}/teams/{{teamId}}/activity/
 Authorization: Bearer {{accessToken}}
