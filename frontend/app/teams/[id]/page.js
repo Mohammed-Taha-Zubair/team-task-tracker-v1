@@ -25,12 +25,11 @@ function TeamViewContent() {
   // Invite member state (Admin only)
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviting, setInviting] = useState(false);
-  const [inviteMessage, setInviteMessage] = useState(null); // { type: 'success' | 'error', text: '' }
+  const [inviteMessage, setInviteMessage] = useState(null);
 
   // Trigger to signal Timeline to refresh immediately
   const [timelineRefreshTrigger, setTimelineRefreshTrigger] = useState(0);
 
-  // Initial load and whenever teamId or currentFilter changes
   useEffect(() => {
     if (!teamId) return;
 
@@ -75,13 +74,11 @@ function TeamViewContent() {
     };
   }, [teamId, currentFilter]);
 
-  // Handle Tab filter change
   const handleFilterChange = (filterKey) => {
     setCurrentFilter(filterKey);
     setLoadingTasks(true);
   };
 
-  // Refresh functions for task creation and invites
   const reloadTasks = async () => {
     if (!teamId) return;
     try {
@@ -103,13 +100,11 @@ function TeamViewContent() {
     }
   };
 
-  // Handle Task creation: refresh tasks and ping timeline
   const handleTaskCreated = () => {
     reloadTasks();
     setTimelineRefreshTrigger((prev) => prev + 1);
   };
 
-  // Handle Invite Member (Admin only)
   const handleInviteMember = async (e) => {
     e.preventDefault();
     if (!inviteEmail.trim()) {
@@ -130,8 +125,6 @@ function TeamViewContent() {
         text: response.message || "Invitation sent successfully!",
       });
       setInviteEmail("");
-
-      // Refresh team to update member list and assignee dropdown
       await reloadTeam();
       setTimelineRefreshTrigger((prev) => prev + 1);
     } catch (err) {
@@ -151,9 +144,9 @@ function TeamViewContent() {
         <div className="mb-6">
           <Link
             href="/dashboard"
-            className="inline-flex items-center text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition"
+            className="inline-flex items-center text-xs font-semibold text-slate-500 hover:text-indigo-600 transition"
           >
-            <span aria-hidden="true" className="mr-1">
+            <span aria-hidden="true" className="mr-1.5 font-bold">
               &larr;
             </span>
             Back to Dashboard
@@ -172,53 +165,52 @@ function TeamViewContent() {
             </Link>
           </div>
         ) : loadingTeam ? (
-          <div className="py-20 text-center text-sm font-medium text-gray-500">
+          <div className="py-20 text-center text-sm font-medium text-slate-400">
             Loading team workspace...
           </div>
         ) : (
-          /* Two Column Layout on Desktop, Stacked on Mobile */
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
             {/* LEFT COLUMN: Team Header, Members, Invite, Tasks, New Task */}
             <div className="lg:col-span-2 space-y-6">
               {/* Team Info Card */}
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+              <div className="bg-white rounded-xl shadow-xs border border-slate-200/90 p-6">
                 <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                   <div>
-                    <h1 className="text-2xl font-bold tracking-tight text-gray-900">
+                    <h1 className="text-xl font-bold tracking-tight text-slate-900">
                       {team?.name}
                     </h1>
-                    <p className="text-sm text-gray-600 mt-1">
+                    <p className="text-sm text-slate-500 mt-1">
                       {team?.description || "No description provided."}
                     </p>
                   </div>
-                  <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100 shrink-0">
+                  <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200/60 shrink-0">
                     {team?.members?.length || 0}{" "}
                     {team?.members?.length === 1 ? "Member" : "Members"}
                   </span>
                 </div>
 
                 {/* Members List */}
-                <div className="mt-6 pt-6 border-t border-gray-100">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3">
+                <div className="mt-6 pt-5 border-t border-slate-100">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">
                     Team Members
                   </h3>
                   <div className="flex flex-wrap gap-2">
                     {team?.members?.map((member) => (
                       <div
                         key={member.id}
-                        className="inline-flex items-center space-x-2 bg-gray-50 border border-gray-200 px-3 py-1.5 rounded-lg text-xs"
+                        className="inline-flex items-center space-x-2 bg-slate-50 border border-slate-200/80 px-2.5 py-1.5 rounded-lg text-xs"
                       >
                         <span className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 font-bold flex items-center justify-center text-[10px]">
                           {member.name ? member.name.charAt(0).toUpperCase() : "U"}
                         </span>
-                        <span className="font-medium text-gray-800">
+                        <span className="font-semibold text-slate-800">
                           {member.name}
                         </span>
                         <span
-                          className={`text-[10px] px-1.5 py-0.5 rounded font-semibold uppercase ${
+                          className={`text-[10px] px-1.5 py-0.5 rounded font-medium uppercase tracking-wide border ${
                             member.role === "admin"
-                              ? "bg-purple-100 text-purple-700"
-                              : "bg-blue-100 text-blue-700"
+                              ? "bg-purple-50 text-purple-700 border-purple-200/60"
+                              : "bg-slate-100 text-slate-600 border-slate-200/60"
                           }`}
                         >
                           {member.role}
@@ -230,26 +222,26 @@ function TeamViewContent() {
 
                 {/* Admin Only: Invite Member Form */}
                 {user?.role === "admin" && (
-                  <div className="mt-6 pt-6 border-t border-gray-100">
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-gray-700 mb-2">
-                      Invite Member to Team
+                  <div className="mt-6 pt-5 border-t border-slate-100">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
+                      Invite Member by Email
                     </h3>
 
                     {inviteMessage && (
                       <div
-                        className={`mb-3 p-3 rounded-lg text-xs font-medium border ${
+                        className={`mb-3 p-3 rounded-lg text-xs font-medium border flex items-center space-x-2 ${
                           inviteMessage.type === "success"
                             ? "bg-emerald-50 border-emerald-200 text-emerald-800"
                             : "bg-red-50 border-red-200 text-red-700"
                         }`}
                       >
-                        {inviteMessage.text}
+                        <span>{inviteMessage.text}</span>
                       </div>
                     )}
 
                     <form
                       onSubmit={handleInviteMember}
-                      className="flex flex-col sm:flex-row gap-3"
+                      className="flex flex-col sm:flex-row gap-2.5"
                     >
                       <input
                         type="email"
@@ -257,12 +249,12 @@ function TeamViewContent() {
                         value={inviteEmail}
                         onChange={(e) => setInviteEmail(e.target.value)}
                         placeholder="colleague@example.com"
-                        className="flex-1 px-3.5 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                        className="flex-1 px-3.5 py-2 bg-white text-slate-900 border border-slate-300 rounded-lg text-sm shadow-2xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition placeholder:text-slate-400"
                       />
                       <button
                         type="submit"
                         disabled={inviting}
-                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg shadow-sm transition disabled:opacity-50 shrink-0"
+                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white text-xs font-semibold rounded-lg shadow-xs transition disabled:opacity-50 shrink-0 cursor-pointer"
                       >
                         {inviting ? "Inviting..." : "Invite Member"}
                       </button>
@@ -271,7 +263,7 @@ function TeamViewContent() {
                 )}
               </div>
 
-              {/* Task List Component with filter tabs */}
+              {/* Task List Component */}
               <TaskList
                 teamId={teamId}
                 tasks={tasks}
@@ -303,7 +295,7 @@ export default function TeamViewPage() {
   return (
     <Suspense
       fallback={
-        <div className="py-20 text-center text-sm font-medium text-gray-500">
+        <div className="py-20 text-center text-sm font-medium text-slate-400">
           Loading team workspace...
         </div>
       }
@@ -312,4 +304,3 @@ export default function TeamViewPage() {
     </Suspense>
   );
 }
-

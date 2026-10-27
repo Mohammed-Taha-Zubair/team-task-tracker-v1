@@ -24,7 +24,7 @@ function TaskDetailContent() {
   const [status, setStatus] = useState("pending");
   const [assignedTo, setAssignedTo] = useState("");
   const [saving, setSaving] = useState(false);
-  const [saveMessage, setSaveMessage] = useState(null); // { type: 'success' | 'error', text: '' }
+  const [saveMessage, setSaveMessage] = useState(null);
 
   // Comments state
   const [comments, setComments] = useState([]);
@@ -92,7 +92,6 @@ function TaskDetailContent() {
     };
   }, [teamId, taskId]);
 
-  // Reload comments helper
   const reloadComments = async () => {
     if (!taskId) return;
     try {
@@ -103,7 +102,6 @@ function TaskDetailContent() {
     }
   };
 
-  // Handle Save Task Edits
   const handleSave = async (e) => {
     e.preventDefault();
     if (!title.trim()) {
@@ -134,7 +132,6 @@ function TaskDetailContent() {
     }
   };
 
-  // Handle Add Comment
   const handleAddComment = async (e) => {
     e.preventDefault();
     if (!commentText.trim()) return;
@@ -159,11 +156,11 @@ function TaskDetailContent() {
   const getStatusBadge = (s) => {
     switch (s) {
       case "in_progress":
-        return "bg-blue-100 text-blue-800 border-blue-200";
+        return "bg-blue-50 text-blue-700 border-blue-200/80";
       case "done":
-        return "bg-emerald-100 text-emerald-800 border-emerald-200";
+        return "bg-emerald-50 text-emerald-700 border-emerald-200/80";
       default:
-        return "bg-gray-100 text-gray-800 border-gray-200";
+        return "bg-amber-50 text-amber-700 border-amber-200/80";
     }
   };
 
@@ -174,12 +171,12 @@ function TaskDetailContent() {
         <div className="mb-6">
           <Link
             href={`/teams/${teamId}`}
-            className="inline-flex items-center text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition"
+            className="inline-flex items-center text-xs font-semibold text-slate-500 hover:text-indigo-600 transition"
           >
-            <span aria-hidden="true" className="mr-1">
+            <span aria-hidden="true" className="mr-1.5 font-bold">
               &larr;
             </span>
-            Back to team
+            Back to Team Workspace
           </Link>
         </div>
 
@@ -191,46 +188,46 @@ function TaskDetailContent() {
               href={`/teams/${teamId}`}
               className="mt-4 inline-block px-4 py-2 bg-red-600 text-white rounded-lg text-xs font-semibold hover:bg-red-700 transition"
             >
-              Back to team workspace
+              Back to Team Workspace
             </Link>
           </div>
         ) : loading ? (
-          <div className="py-20 text-center text-sm font-medium text-gray-500">
+          <div className="py-20 text-center text-sm font-medium text-slate-400">
             Loading task details...
           </div>
         ) : (
-          <div className="space-y-8">
+          <div className="space-y-6">
             {/* Task Edit Form Card */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 sm:p-8">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-6 border-b border-gray-100 gap-4">
+            <div className="bg-white rounded-xl shadow-xs border border-slate-200/90 p-6 sm:p-8">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-6 border-b border-slate-100 gap-4">
                 <div>
-                  <div className="flex items-center space-x-2">
-                    <span className="text-xs font-mono text-gray-400">
+                  <div className="flex items-center space-x-2.5">
+                    <span className="text-xs font-mono text-slate-400">
                       TASK #{task?.id?.slice(-6)}
                     </span>
                     <span
-                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border uppercase tracking-wider ${getStatusBadge(
+                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-medium border uppercase tracking-wider ${getStatusBadge(
                         task?.status
                       )}`}
                     >
                       {task?.status?.replace("_", " ")}
                     </span>
                   </div>
-                  <h1 className="text-2xl font-bold tracking-tight text-gray-900 mt-1">
+                  <h1 className="text-xl font-bold tracking-tight text-slate-900 mt-1.5">
                     {task?.title}
                   </h1>
                 </div>
 
-                <div className="text-xs text-gray-500 text-left sm:text-right shrink-0">
+                <div className="text-xs text-slate-400 text-left sm:text-right shrink-0">
                   <p>
                     Updated:{" "}
-                    <span className="font-medium text-gray-700">
+                    <span className="font-medium text-slate-600">
                       {formatRelativeTime(task?.updated_at)}
                     </span>
                   </p>
                   <p className="mt-0.5">
                     Created:{" "}
-                    <span className="font-medium text-gray-700">
+                    <span className="font-medium text-slate-600">
                       {formatRelativeTime(task?.created_at)}
                     </span>
                   </p>
@@ -249,9 +246,9 @@ function TaskDetailContent() {
                 </div>
               )}
 
-              <form onSubmit={handleSave} className="mt-6 space-y-5">
+              <form onSubmit={handleSave} className="mt-6 space-y-4">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                     Title <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -259,12 +256,12 @@ function TaskDetailContent() {
                     required
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
-                    className="w-full px-3.5 py-2.5 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm font-medium"
+                    className="w-full px-3.5 py-2.5 bg-white text-slate-900 border border-slate-300 rounded-lg text-sm shadow-2xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition placeholder:text-slate-400"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                     Description
                   </label>
                   <textarea
@@ -272,19 +269,19 @@ function TaskDetailContent() {
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                     placeholder="Task details and instructions..."
-                    className="w-full px-3.5 py-2.5 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm resize-none"
+                    className="w-full px-3.5 py-2.5 bg-white text-slate-900 border border-slate-300 rounded-lg text-sm shadow-2xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition resize-none placeholder:text-slate-400"
                   />
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                       Status
                     </label>
                     <select
                       value={status}
                       onChange={(e) => setStatus(e.target.value)}
-                      className="w-full px-3.5 py-2.5 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm bg-white"
+                      className="w-full px-3.5 py-2.5 bg-white text-slate-900 border border-slate-300 rounded-lg text-sm shadow-2xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition"
                     >
                       <option value="pending">Pending</option>
                       <option value="in_progress">In Progress</option>
@@ -293,13 +290,13 @@ function TaskDetailContent() {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                       Assignee
                     </label>
                     <select
                       value={assignedTo}
                       onChange={(e) => setAssignedTo(e.target.value)}
-                      className="w-full px-3.5 py-2.5 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm bg-white"
+                      className="w-full px-3.5 py-2.5 bg-white text-slate-900 border border-slate-300 rounded-lg text-sm shadow-2xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition"
                     >
                       <option value="">Unassigned</option>
                       {members.map((member) => (
@@ -315,30 +312,30 @@ function TaskDetailContent() {
                   <button
                     type="submit"
                     disabled={saving}
-                    className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg shadow-sm transition disabled:opacity-50"
+                    className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white text-xs font-semibold rounded-lg shadow-xs transition disabled:opacity-50 cursor-pointer"
                   >
-                    {saving ? "Saving Changes..." : "Save"}
+                    {saving ? "Saving Changes..." : "Save Changes"}
                   </button>
                 </div>
               </form>
             </div>
 
             {/* Comments Section */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 sm:p-8">
-              <div className="pb-4 border-b border-gray-100 flex items-center justify-between">
+            <div className="bg-white rounded-xl shadow-xs border border-slate-200/90 p-6 sm:p-8">
+              <div className="pb-4 border-b border-slate-100 flex items-center justify-between">
                 <div>
-                  <h2 className="text-lg font-bold text-gray-900">Task Discussion</h2>
-                  <p className="text-xs text-gray-500 mt-0.5">
+                  <h2 className="text-base font-bold text-slate-900">Task Discussion</h2>
+                  <p className="text-xs text-slate-500 mt-0.5">
                     Comments and team conversation on this task
                   </p>
                 </div>
-                <span className="text-xs font-semibold text-gray-500 bg-gray-100 px-2.5 py-1 rounded-full">
+                <span className="text-xs font-semibold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-full border border-slate-200/60">
                   {comments.length} {comments.length === 1 ? "Comment" : "Comments"}
                 </span>
               </div>
 
               {/* Add Comment Form */}
-              <form onSubmit={handleAddComment} className="mt-6">
+              <form onSubmit={handleAddComment} className="mt-5">
                 {commentError && (
                   <div className="mb-3 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-xs font-medium">
                     {commentError}
@@ -352,14 +349,14 @@ function TaskDetailContent() {
                     value={commentText}
                     onChange={(e) => setCommentText(e.target.value)}
                     placeholder="Write a comment or status update..."
-                    className="w-full px-3.5 py-2.5 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm resize-none"
+                    className="w-full px-3.5 py-2.5 bg-white text-slate-900 border border-slate-300 rounded-lg text-sm shadow-2xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition resize-none placeholder:text-slate-400"
                   />
                 </div>
-                <div className="mt-3 flex justify-end">
+                <div className="mt-2.5 flex justify-end">
                   <button
                     type="submit"
                     disabled={postingComment || !commentText.trim()}
-                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg shadow-sm transition disabled:opacity-50"
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white text-xs font-semibold rounded-lg shadow-xs transition disabled:opacity-50 cursor-pointer"
                   >
                     {postingComment ? "Posting..." : "Post Comment"}
                   </button>
@@ -367,21 +364,21 @@ function TaskDetailContent() {
               </form>
 
               {/* Comments Feed */}
-              <div className="mt-8 pt-6 border-t border-gray-100">
+              <div className="mt-6 pt-5 border-t border-slate-100">
                 {loadingComments ? (
-                  <div className="py-8 text-center text-xs text-gray-400 font-medium">
+                  <div className="py-8 text-center text-xs text-slate-400 font-medium">
                     Loading discussion...
                   </div>
                 ) : comments.length === 0 ? (
-                  <div className="py-8 text-center bg-gray-50/50 rounded-lg border border-dashed border-gray-200 text-xs text-gray-500">
+                  <div className="py-8 text-center bg-slate-50/50 rounded-lg border border-dashed border-slate-200 text-xs text-slate-500">
                     No comments yet. Start the conversation above!
                   </div>
                 ) : (
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     {comments.map((comment) => (
                       <div
                         key={comment.id}
-                        className="bg-gray-50/70 border border-gray-100 rounded-xl p-4 transition hover:bg-gray-50"
+                        className="bg-slate-50/70 border border-slate-200/60 rounded-xl p-4 transition hover:bg-slate-50"
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-2">
@@ -390,15 +387,15 @@ function TaskDetailContent() {
                                 ? comment.user.name.charAt(0).toUpperCase()
                                 : "U"}
                             </span>
-                            <span className="text-xs font-bold text-gray-900">
+                            <span className="text-xs font-semibold text-slate-900">
                               {comment.user?.name || "Team Member"}
                             </span>
                           </div>
-                          <span className="text-[11px] text-gray-400">
+                          <span className="text-[11px] text-slate-400">
                             {formatRelativeTime(comment.created_at)}
                           </span>
                         </div>
-                        <p className="text-xs text-gray-700 mt-2.5 whitespace-pre-wrap leading-relaxed">
+                        <p className="text-xs text-slate-700 mt-2 whitespace-pre-wrap leading-relaxed">
                           {comment.text}
                         </p>
                       </div>
@@ -418,7 +415,7 @@ export default function TaskDetailPage() {
   return (
     <Suspense
       fallback={
-        <div className="py-20 text-center text-sm font-medium text-gray-500">
+        <div className="py-20 text-center text-sm font-medium text-slate-400">
           Loading task...
         </div>
       }

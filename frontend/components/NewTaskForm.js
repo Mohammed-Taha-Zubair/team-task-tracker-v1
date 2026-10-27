@@ -32,14 +32,12 @@ export default function NewTaskForm({ teamId, members = [], onTaskCreated }) {
 
       await api.post(`/api/teams/${teamId}/tasks/`, payload);
 
-      // Reset form fields
       setTitle("");
       setDescription("");
       setAssignedTo("");
       setStatus("pending");
       setIsExpanded(false);
 
-      // Notify parent to refresh both task list and timeline
       if (onTaskCreated) {
         onTaskCreated();
       }
@@ -51,11 +49,11 @@ export default function NewTaskForm({ teamId, members = [], onTaskCreated }) {
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+    <div className="bg-white rounded-xl shadow-xs border border-slate-200/90 p-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-base font-bold text-gray-900">Create New Task</h2>
-          <p className="text-xs text-gray-500 mt-0.5">
+          <h2 className="text-sm font-bold text-slate-900">Create New Task</h2>
+          <p className="text-xs text-slate-500 mt-0.5">
             Add a task for your team members to collaborate on
           </p>
         </div>
@@ -63,7 +61,7 @@ export default function NewTaskForm({ teamId, members = [], onTaskCreated }) {
           <button
             type="button"
             onClick={() => setIsExpanded(true)}
-            className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg shadow-sm transition"
+            className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white text-xs font-semibold rounded-lg shadow-xs transition cursor-pointer"
           >
             + New Task
           </button>
@@ -79,7 +77,7 @@ export default function NewTaskForm({ teamId, members = [], onTaskCreated }) {
           )}
 
           <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-1">
+            <label className="block text-xs font-semibold text-slate-700 mb-1.5">
               Title <span className="text-red-500">*</span>
             </label>
             <input
@@ -88,12 +86,12 @@ export default function NewTaskForm({ teamId, members = [], onTaskCreated }) {
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="e.g. Implement user settings page"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+              className="w-full px-3.5 py-2.5 bg-white text-slate-900 border border-slate-300 rounded-lg text-sm shadow-2xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition placeholder:text-slate-400"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-1">
+            <label className="block text-xs font-semibold text-slate-700 mb-1.5">
               Description
             </label>
             <textarea
@@ -101,19 +99,19 @@ export default function NewTaskForm({ teamId, members = [], onTaskCreated }) {
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Provide context, acceptance criteria, or links..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm resize-none"
+              className="w-full px-3.5 py-2.5 bg-white text-slate-900 border border-slate-300 rounded-lg text-sm shadow-2xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition resize-none placeholder:text-slate-400"
             />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1">
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                 Assignee
               </label>
               <select
                 value={assignedTo}
                 onChange={(e) => setAssignedTo(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm bg-white"
+                className="w-full px-3.5 py-2.5 bg-white text-slate-900 border border-slate-300 rounded-lg text-sm shadow-2xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition"
               >
                 <option value="">Unassigned</option>
                 {members.map((member) => (
@@ -125,13 +123,13 @@ export default function NewTaskForm({ teamId, members = [], onTaskCreated }) {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1">
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                 Status
               </label>
               <select
                 value={status}
                 onChange={(e) => setStatus(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm bg-white"
+                className="w-full px-3.5 py-2.5 bg-white text-slate-900 border border-slate-300 rounded-lg text-sm shadow-2xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition"
               >
                 <option value="pending">Pending</option>
                 <option value="in_progress">In Progress</option>
@@ -148,14 +146,14 @@ export default function NewTaskForm({ teamId, members = [], onTaskCreated }) {
                 setError("");
               }}
               disabled={submitting}
-              className="px-3.5 py-2 text-xs font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition"
+              className="px-3.5 py-2 text-xs font-medium text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={submitting}
-              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg shadow-sm transition disabled:opacity-50"
+              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white text-xs font-semibold rounded-lg shadow-xs transition disabled:opacity-50 cursor-pointer"
             >
               {submitting ? "Creating..." : "Create Task"}
             </button>
