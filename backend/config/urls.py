@@ -1,10 +1,8 @@
-from django.contrib import admin
 from django.urls import path, include
 from apps.users.views import UserListCreateView, UserDetailView
 
 # Top-level URL routing for the project: includes each app's urls.py
 urlpatterns = [
-    path("admin/", admin.site.urls),
     path("api/auth/", include("apps.users.urls")),
     path("api/teams/", include("apps.teams.urls")),
     path("api/teams/", include("apps.activity.urls")),

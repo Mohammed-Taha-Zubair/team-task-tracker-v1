@@ -12,7 +12,7 @@ from apps.users.authentication import generate_access_token
 
 
 class ComprehensiveAuditTestSuite(SimpleTestCase):
-    databases = {"default"}
+    databases = set()
 
     def setUp(self):
         self.client = APIClient()
@@ -570,52 +570,50 @@ class ComprehensiveAuditTestSuite(SimpleTestCase):
         self.assertTrue(check_password("Password123!", user.password))
         user.delete()
 
-    def test_create_app_admin_command(self):
-        """Verify python manage.py create_app_admin creates or updates an ADMIN."""
+    def test_createsuperuser_command(self):
+        """Verify python manage.py createsuperuser creates or updates a SUPERADMIN in MongoDB."""
         from django.core.management import call_command
         from io import StringIO
         out = StringIO()
-        email = "cmd_admin@example.com"
+        email = "cmd_superuser@example.com"
         User.objects(email=email).delete()
 
-        call_command("create_app_admin", name="Cmd Admin", email=email, password="Password123!", stdout=out)
+        call_command("createsuperuser", name="Cmd Superuser", email=email, password="Password123!", stdout=out)
         user = User.objects(email=email).first()
         self.assertIsNotNone(user)
-        self.assertEqual(user.role, "ADMIN")
+        self.assertEqual(user.role, "SUPERADMIN")
         self.assertTrue(check_password("Password123!", user.password))
         user.delete()
 
-    def test_django_superadmin_vs_application_admin_separation(self):
-        """Verify Django superuser can access Django Admin and Application Admin is not a Django superuser."""
-        from django.contrib.auth.models import User as DjangoAuthUser
-        from django.test import Client
+    def test_superadmin_promotes_member_to_admin_flow(self):
+        """Verify only Superadmin can promote a user to ADMIN and members cannot self-promote."""
+        # 1. Normal user registers, strictly gets MEMBER role
+        reg_resp = self.client.post("/api/auth/register/", {
+            "name": "Target Member",
+            "email": "targetmember@example.com",
+            "password": "Password123!",
+            "role": "ADMIN",  # Ignored by server
+        })
+        self.assertEqual(reg_resp.status_code, 201)
+        target_user = User.objects(email="targetmember@example.com").first()
+        self.assertIsNotNone(target_user)
+        self.assertEqual(target_user.role, "MEMBER")
 
-        # Create platform superuser in Django's relational auth database
-        DjangoAuthUser.objects.filter(username="djangosuperuser").delete()
-        dj_super = DjangoAuthUser.objects.create_superuser(
-            username="djangosuperuser",
-            email="platform_admin@example.com",
-            password="SuperPlatformPass123!",
-        )
+        # 2. Member tries to promote themselves or another user - Forbidden
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.member1_token}")
+        patch_resp = self.client.patch(f"/api/users/{target_user.id}/", {"role": "ADMIN"})
+        self.assertEqual(patch_resp.status_code, 403)
+        target_user.reload()
+        self.assertEqual(target_user.role, "MEMBER")
 
-        # Standard Django test client supports sessions for admin login
-        session_client = Client()
-        login_success = session_client.login(username="djangosuperuser", password="SuperPlatformPass123!")
-        self.assertTrue(login_success)
+        # 3. Superadmin promotes member to ADMIN - Success
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.superadmin_token}")
+        promote_resp = self.client.patch(f"/api/users/{target_user.id}/", {"role": "ADMIN"})
+        self.assertEqual(promote_resp.status_code, 200)
+        target_user.reload()
+        self.assertEqual(target_user.role, "ADMIN")
 
-        # Django superuser can access Django Admin portal
-        admin_resp = session_client.get("/admin/")
-        self.assertEqual(admin_resp.status_code, 200)
-
-        # Verify Application Admin is purely in MongoDB and NOT in Django auth
-        self.assertFalse(DjangoAuthUser.objects.filter(email=self.admin.email).exists())
-        self.assertFalse(hasattr(self.admin, "is_superuser"))
-
-        # Verify Application Admin cannot log into Django admin
-        app_admin_login = session_client.login(username=self.admin.email, password="AdminPass123!")
-        self.assertFalse(app_admin_login)
-
-        dj_super.delete()
+        target_user.delete()
 
     def test_custom_middlewares_execution(self):
         """Verify custom JWT, Role Access Control, and Logging middlewares execute properly."""
