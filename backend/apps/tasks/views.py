@@ -227,7 +227,14 @@ class TaskDetailView(APIView):
                     status=status.HTTP_403_FORBIDDEN,
                 )
 
+        old_title = task.title
+        old_description = task.description or ""
+        old_assigned_id = str(task.assigned_to.id) if task.assigned_to else None
         old_status = task.status
+
+        title_changed = False
+        desc_changed = False
+        assigned_changed = False
         status_changed = False
 
         if "title" in request.data:
@@ -237,15 +244,22 @@ class TaskDetailView(APIView):
                     {"message": "Title cannot be empty"},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-            task.title = title
+            if title != old_title:
+                task.title = title
+                title_changed = True
 
         if "description" in request.data:
-            task.description = request.data.get("description", "").strip()
+            description = request.data.get("description", "").strip()
+            if description != old_description:
+                task.description = description
+                desc_changed = True
 
         if "assigned_to" in request.data:
             assigned_to_id = request.data.get("assigned_to")
             if assigned_to_id in [None, ""]:
-                task.assigned_to = None
+                if old_assigned_id is not None:
+                    task.assigned_to = None
+                    assigned_changed = True
             else:
                 if not ObjectId.is_valid(assigned_to_id):
                     return Response(
@@ -267,7 +281,9 @@ class TaskDetailView(APIView):
                         {"message": "Assigned user must be a team member"},
                         status=status.HTTP_400_BAD_REQUEST,
                     )
-                task.assigned_to = assigned_user
+                if old_assigned_id != str(assigned_to_id):
+                    task.assigned_to = assigned_user
+                    assigned_changed = True
 
         if "status" in request.data:
             new_status = request.data.get("status", "").strip().lower()
@@ -277,8 +293,13 @@ class TaskDetailView(APIView):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
             if new_status != old_status:
-                status_changed = True
                 task.status = new_status
+                status_changed = True
+
+        # Prevent duplicate activity logging if no fields actually changed
+        any_changed = title_changed or desc_changed or assigned_changed or status_changed
+        if not any_changed:
+            return Response(format_task(task), status=status.HTTP_200_OK)
 
         task.updated_at = datetime.utcnow()
         task.save()
@@ -288,7 +309,7 @@ class TaskDetailView(APIView):
             "in_progress": "In Progress",
             "done": "Done",
         }
-        if status_changed:
+        if status_changed and not (title_changed or desc_changed or assigned_changed):
             status_text = status_labels.get(task.status, task.status)
             message = f'{request.user.name} changed status of "{task.title}" to {status_text}.'
             action_type = "status_changed"

@@ -781,3 +781,48 @@ class ComprehensiveAuditTestSuite(SimpleTestCase):
         resp_act = self.client.get("/api/activities/")
         self.assertEqual(resp_act.status_code, 200)
         self.assertIsInstance(resp_act.json(), list)
+
+    def test_repeated_identical_status_updates_do_not_create_duplicate_activities(self):
+        """Verify that updating a task with identical status does not create duplicate activity logs."""
+        team = Team(
+            name="Audit Deduplication Team",
+            created_by=self.admin,
+            members=[self.admin, self.member1],
+        )
+        team.save()
+
+        task = Task(
+            title="Deduplication Task",
+            team=team,
+            created_by=self.admin,
+            status="pending",
+        )
+        task.save()
+
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.member1_token}")
+
+        initial_activity_count = Activity.objects(team=team).count()
+
+        # 1. Update status to same existing status ("pending") 3 times
+        for _ in range(3):
+            resp = self.client.patch(f"/api/tasks/{task.id}/", {"status": "pending"})
+            self.assertEqual(resp.status_code, 200)
+
+        # Activity count should not increase because status did not change
+        self.assertEqual(Activity.objects(team=team).count(), initial_activity_count)
+
+        # 2. Update status to a new status ("in_progress") once
+        resp_new = self.client.patch(f"/api/tasks/{task.id}/", {"status": "in_progress"})
+        self.assertEqual(resp_new.status_code, 200)
+
+        # Exactly 1 new activity logged
+        self.assertEqual(Activity.objects(team=team).count(), initial_activity_count + 1)
+
+        # 3. Repeat "in_progress" 3 times
+        for _ in range(3):
+            resp = self.client.patch(f"/api/tasks/{task.id}/", {"status": "in_progress"})
+            self.assertEqual(resp.status_code, 200)
+
+        # Still only 1 new activity logged
+        self.assertEqual(Activity.objects(team=team).count(), initial_activity_count + 1)
+
