@@ -201,8 +201,23 @@ class TeamTaskListCreateView(APIView):
         )
 
 
+# GET /api/tasks/assigned-to-me/ : Return tasks assigned to the authenticated user
+class TaskAssignedToMeView(APIView):
+    def get(self, request):
+        if not request.user or not getattr(request.user, "is_authenticated", False):
+            return Response(
+                {"message": "Authentication required"},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        # In MongoEngine, query tasks where assigned_to is current user
+        tasks = Task.objects(assigned_to=request.user).order_by("-updated_at")
+        return Response([format_task(t) for t in tasks], status=status.HTTP_200_OK)
+
+
 # GET /api/tasks/<id>/ and PATCH /api/tasks/<id>/ (team members only)
-# Members can only update status. Title, description, and assignee can only be modified by admins.
+# Members can only update status if the task is assigned to them.
+# Title, description, and assignee can only be modified by admins.
 class TaskDetailView(APIView):
     def get(self, request, id):
         task, team = get_task_and_team_or_error(id, request.user)
@@ -213,8 +228,21 @@ class TaskDetailView(APIView):
 
         is_admin = getattr(request.user, "is_admin_or_superadmin", False)
 
-        # Members can only change task status
+        # Task-level authorization for Members:
+        # 1. Member can only modify tasks assigned to them.
+        # 2. Member can only modify status (never title, description, or assigned_to).
         if not is_admin:
+            is_assigned = (
+                task.assigned_to
+                and hasattr(task.assigned_to, "id")
+                and str(task.assigned_to.id) == str(request.user.id)
+            )
+            if not is_assigned:
+                return Response(
+                    {"message": "This task is not assigned to you. You have read-only access."},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
             disallowed = [f for f in ["title", "description", "assigned_to"] if f in request.data]
             if disallowed:
                 return Response(
@@ -309,7 +337,17 @@ class TaskDetailView(APIView):
             "in_progress": "In Progress",
             "done": "Done",
         }
-        if status_changed and not (title_changed or desc_changed or assigned_changed):
+        if assigned_changed:
+            if task.assigned_to:
+                assignee_name = getattr(task.assigned_to, "name", "a team member")
+                if old_assigned_id:
+                    message = f'{request.user.name} reassigned task "{task.title}" to {assignee_name}'
+                else:
+                    message = f'{request.user.name} assigned task "{task.title}" to {assignee_name}'
+            else:
+                message = f'{request.user.name} unassigned task "{task.title}"'
+            action_type = "task_assigned"
+        elif status_changed and not (title_changed or desc_changed):
             status_text = status_labels.get(task.status, task.status)
             message = f'{request.user.name} changed status of "{task.title}" to {status_text}.'
             action_type = "status_changed"
@@ -329,7 +367,7 @@ class TaskDetailView(APIView):
 
 
 # GET /api/tasks/<id>/comments/ : List comments (oldest first, includes user name)
-# POST /api/tasks/<id>/comments/ : Add comment to task
+# POST /api/tasks/<id>/comments/ : Add comment to task (Admins/Superadmins or Assigned Member only)
 class TaskCommentsView(APIView):
     def get(self, request, id):
         task, team = get_task_and_team_or_error(id, request.user)
@@ -360,6 +398,21 @@ class TaskCommentsView(APIView):
 
     def post(self, request, id):
         task, team = get_task_and_team_or_error(id, request.user)
+
+        is_admin = getattr(request.user, "is_admin_or_superadmin", False)
+
+        # Members can only comment on tasks assigned to them
+        if not is_admin:
+            is_assigned = (
+                task.assigned_to
+                and hasattr(task.assigned_to, "id")
+                and str(task.assigned_to.id) == str(request.user.id)
+            )
+            if not is_assigned:
+                return Response(
+                    {"message": "This task is not assigned to you. You have read-only access."},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
 
         text = request.data.get("text", "").strip()
         if not text:

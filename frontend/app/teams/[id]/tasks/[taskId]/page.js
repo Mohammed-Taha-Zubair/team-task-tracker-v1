@@ -103,6 +103,7 @@ function TaskDetailContent() {
 
             <TaskComments
               taskId={taskId}
+              task={task}
               comments={comments}
               loading={loadingComments}
               onCommentAdded={fetchComments}

@@ -11,6 +11,12 @@ export default function TaskEditForm({ task, members = [], onTaskSaved }) {
     (user?.role || "").toUpperCase() === "ADMIN" ||
     (user?.role || "").toUpperCase() === "SUPERADMIN";
 
+  const isAssigned = Boolean(
+    task?.assigned_to?.id &&
+    user?.id &&
+    String(task.assigned_to.id) === String(user.id)
+  );
+
   const [title, setTitle] = useState(task?.title || "");
   const [description, setDescription] = useState(task?.description || "");
   const [status, setStatus] = useState(task?.status || "pending");
@@ -154,6 +160,16 @@ export default function TaskEditForm({ task, members = [], onTaskSaved }) {
       {/* ============================================================== */}
       {!canManageTaskDetails ? (
         <div className="space-y-6">
+          {/* Read-Only Notice for Unassigned Member */}
+          {!isAssigned && (
+            <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-xs font-semibold text-amber-900 flex items-center space-x-2.5">
+              <svg className="w-5 h-5 text-amber-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span>This task is not assigned to you. You have read-only access.</span>
+            </div>
+          )}
+
           {/* Read-Only Description */}
           <div className="bg-slate-50/70 border border-slate-200/80 rounded-xl p-5">
             <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
@@ -179,6 +195,11 @@ export default function TaskEditForm({ task, members = [], onTaskSaved }) {
                 <span className="text-sm font-semibold text-slate-800">
                   {task?.assigned_to?.name || "Unassigned"}
                 </span>
+                {isAssigned && (
+                  <span className="text-[10px] bg-emerald-50 text-emerald-700 font-bold px-2 py-0.5 rounded-full border border-emerald-200">
+                    You
+                  </span>
+                )}
               </div>
             </div>
 
@@ -197,23 +218,30 @@ export default function TaskEditForm({ task, members = [], onTaskSaved }) {
           {/* Member Status Updater Box */}
           <form
             onSubmit={handleSave}
-            className="bg-indigo-50/50 border border-indigo-100 rounded-xl p-5"
+            className={`border rounded-xl p-5 ${
+              isAssigned
+                ? "bg-indigo-50/50 border-indigo-100"
+                : "bg-slate-50/60 border-slate-200"
+            }`}
           >
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
                 <label className="block text-xs font-bold text-slate-900 uppercase tracking-wide">
-                  Update Task Status
+                  Task Status
                 </label>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Change the status to reflect your progress on this task.
+                  {isAssigned
+                    ? "Change the status to reflect your progress on this task."
+                    : "Only assigned members can change task status."}
                 </p>
               </div>
 
               <div className="flex items-center space-x-3">
                 <select
+                  disabled={!isAssigned}
                   value={status}
                   onChange={(e) => setStatus(e.target.value)}
-                  className="px-3.5 py-2 bg-white text-slate-900 border border-indigo-200 rounded-lg text-sm font-medium shadow-2xs focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                  className="px-3.5 py-2 bg-white text-slate-900 border border-slate-300 rounded-lg text-sm font-medium shadow-2xs focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed cursor-pointer"
                 >
                   <option value="pending">Pending</option>
                   <option value="in_progress">In Progress</option>
@@ -222,10 +250,12 @@ export default function TaskEditForm({ task, members = [], onTaskSaved }) {
 
                 <button
                   type="submit"
-                  disabled={saving || status === task?.status}
+                  disabled={!isAssigned || saving || status === task?.status}
                   className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white text-xs font-semibold rounded-lg shadow-xs transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shrink-0"
                 >
-                  {saving
+                  {!isAssigned
+                    ? "Read-Only Access"
+                    : saving
                     ? "Updating..."
                     : status === task?.status
                     ? "Status Up to Date"

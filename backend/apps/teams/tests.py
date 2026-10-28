@@ -504,6 +504,7 @@ class ComprehensiveAuditTestSuite(SimpleTestCase):
             title="Allowed Status Change Task",
             team=team,
             created_by=self.admin,
+            assigned_to=self.member1,
             status="pending",
         )
         task.save()
@@ -598,7 +599,7 @@ class ComprehensiveAuditTestSuite(SimpleTestCase):
         self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.admin_token}")
         create_resp = self.client.post(
             f"/api/teams/{team.id}/tasks/",
-            {"title": "Task 1", "status": "pending"},
+            {"title": "Task 1", "status": "pending", "assigned_to": str(self.member1.id)},
             format="json",
         )
         self.assertEqual(create_resp.status_code, 201)
@@ -795,6 +796,7 @@ class ComprehensiveAuditTestSuite(SimpleTestCase):
             title="Deduplication Task",
             team=team,
             created_by=self.admin,
+            assigned_to=self.member1,
             status="pending",
         )
         task.save()
@@ -825,4 +827,373 @@ class ComprehensiveAuditTestSuite(SimpleTestCase):
 
         # Still only 1 new activity logged
         self.assertEqual(Activity.objects(team=team).count(), initial_activity_count + 1)
+
+    # ---------------------------------------------------------
+    # 5. TASK-LEVEL AUTHORIZATION & ASSIGNMENT SCENARIOS (1 to 6)
+    # ---------------------------------------------------------
+
+    def test_scenario_1_unassigned_member_read_only(self):
+        """
+        Scenario 1: Member A belongs to Team A but is not assigned to Task 1.
+        - Can view Task 1.
+        - Cannot change its status.
+        - Cannot add comments.
+        - Cannot edit its title or description.
+        """
+        team_a = Team(
+            name="Audit Team S1",
+            created_by=self.admin,
+            members=[self.admin, self.member1],
+        )
+        team_a.save()
+
+        # Task 1 is unassigned
+        task_1 = Task(
+            title="Task 1 Unassigned",
+            description="Initial Description",
+            team=team_a,
+            created_by=self.admin,
+            status="pending",
+        )
+        task_1.save()
+
+        # Member A credentials
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.member1_token}")
+
+        # 1. Can view Task 1
+        view_resp = self.client.get(f"/api/tasks/{task_1.id}/")
+        self.assertEqual(view_resp.status_code, 200)
+        self.assertEqual(view_resp.json()["title"], "Task 1 Unassigned")
+
+        # 2. Cannot change its status -> 403 Forbidden
+        status_resp = self.client.patch(f"/api/tasks/{task_1.id}/", {"status": "in_progress"})
+        self.assertEqual(status_resp.status_code, 403)
+        self.assertIn("not assigned to you", status_resp.json()["message"].lower())
+
+        # 3. Cannot add comments -> 403 Forbidden
+        comment_resp = self.client.post(
+            f"/api/tasks/{task_1.id}/comments/",
+            {"text": "Unauthorized comment"},
+            format="json",
+        )
+        self.assertEqual(comment_resp.status_code, 403)
+        self.assertIn("not assigned to you", comment_resp.json()["message"].lower())
+
+        # 4. Cannot edit its title or description -> 403 Forbidden
+        edit_resp = self.client.patch(
+            f"/api/tasks/{task_1.id}/",
+            {"title": "Modified Title", "description": "Modified Description"},
+            format="json",
+        )
+        self.assertEqual(edit_resp.status_code, 403)
+
+    def test_scenario_2_assigned_member_permissions(self):
+        """
+        Scenario 2: Member A is assigned to Task 1.
+        - Can view Task 1.
+        - Can change its status.
+        - Can add comments.
+        - Cannot edit its title or description.
+        - Cannot change its assignee.
+        """
+        team_a = Team(
+            name="Audit Team S2",
+            created_by=self.admin,
+            members=[self.admin, self.member1],
+        )
+        team_a.save()
+
+        task_1 = Task(
+            title="Task 1 Assigned to Member A",
+            description="Initial Description",
+            team=team_a,
+            created_by=self.admin,
+            assigned_to=self.member1,
+            status="pending",
+        )
+        task_1.save()
+
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.member1_token}")
+
+        # 1. Can view Task 1
+        view_resp = self.client.get(f"/api/tasks/{task_1.id}/")
+        self.assertEqual(view_resp.status_code, 200)
+        self.assertEqual(view_resp.json()["assigned_to"]["id"], str(self.member1.id))
+
+        # 2. Can change its status -> 200 OK
+        status_resp = self.client.patch(f"/api/tasks/{task_1.id}/", {"status": "in_progress"})
+        self.assertEqual(status_resp.status_code, 200)
+        self.assertEqual(status_resp.json()["status"], "in_progress")
+
+        # 3. Can add comments -> 201 Created
+        comment_resp = self.client.post(
+            f"/api/tasks/{task_1.id}/comments/",
+            {"text": "I am working on this task."},
+            format="json",
+        )
+        self.assertEqual(comment_resp.status_code, 201)
+        self.assertEqual(comment_resp.json()["text"], "I am working on this task.")
+
+        # 4. Cannot edit its title or description -> 403 Forbidden
+        title_resp = self.client.patch(f"/api/tasks/{task_1.id}/", {"title": "New Title by Member"})
+        self.assertEqual(title_resp.status_code, 403)
+
+        desc_resp = self.client.patch(f"/api/tasks/{task_1.id}/", {"description": "New Desc by Member"})
+        self.assertEqual(desc_resp.status_code, 403)
+
+        # 5. Cannot change its assignee -> 403 Forbidden
+        assign_resp = self.client.patch(f"/api/tasks/{task_1.id}/", {"assigned_to": str(self.admin.id)})
+        self.assertEqual(assign_resp.status_code, 403)
+
+    def test_scenario_3_other_member_cannot_modify_or_comment(self):
+        """
+        Scenario 3: Member B belongs to Team A but Task 1 is assigned to Member A.
+        - Cannot change Task 1's status.
+        - Cannot add comments to Task 1.
+        """
+        team_a = Team(
+            name="Audit Team S3",
+            created_by=self.admin,
+            members=[self.admin, self.member1, self.member2],
+        )
+        team_a.save()
+
+        task_1 = Task(
+            title="Task 1 Belonging to Member A",
+            team=team_a,
+            created_by=self.admin,
+            assigned_to=self.member1,
+            status="pending",
+        )
+        task_1.save()
+
+        # Member B credentials
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.member2_token}")
+
+        # Member B can view the task
+        view_resp = self.client.get(f"/api/tasks/{task_1.id}/")
+        self.assertEqual(view_resp.status_code, 200)
+
+        # Member B cannot change Task 1's status -> 403 Forbidden
+        status_resp = self.client.patch(f"/api/tasks/{task_1.id}/", {"status": "done"})
+        self.assertEqual(status_resp.status_code, 403)
+        self.assertIn("not assigned to you", status_resp.json()["message"].lower())
+
+        # Member B cannot add comments to Task 1 -> 403 Forbidden
+        comment_resp = self.client.post(
+            f"/api/tasks/{task_1.id}/comments/",
+            {"text": "Member B comment"},
+            format="json",
+        )
+        self.assertEqual(comment_resp.status_code, 403)
+        self.assertIn("not assigned to you", comment_resp.json()["message"].lower())
+
+    def test_scenario_4_admin_task_management_and_validation(self):
+        """
+        Scenario 4: Admin belongs to Team A.
+        - Can create tasks.
+        - Can assign tasks to Team A members.
+        - Can edit task details.
+        - Cannot assign tasks to users outside Team A.
+        """
+        team_a = Team(
+            name="Audit Team S4",
+            created_by=self.admin,
+            members=[self.admin, self.member1],  # member2 is NOT in Team A
+        )
+        team_a.save()
+
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.admin_token}")
+
+        # 1. Admin can create tasks and assign to Team A members -> 201 Created
+        create_resp = self.client.post(
+            f"/api/teams/{team_a.id}/tasks/",
+            {
+                "title": "Admin Created Task",
+                "description": "Full description",
+                "assigned_to": str(self.member1.id),
+                "status": "pending",
+            },
+            format="json",
+        )
+        self.assertEqual(create_resp.status_code, 201)
+        task_id = create_resp.json()["id"]
+
+        # 2. Admin can edit task details (title, description, status)
+        edit_resp = self.client.patch(
+            f"/api/tasks/{task_id}/",
+            {
+                "title": "Renamed Task",
+                "description": "Updated description",
+                "status": "in_progress",
+            },
+            format="json",
+        )
+        self.assertEqual(edit_resp.status_code, 200)
+        self.assertEqual(edit_resp.json()["title"], "Renamed Task")
+        self.assertEqual(edit_resp.json()["status"], "in_progress")
+
+        # 3. Cannot assign tasks to users outside Team A -> 400 Bad Request
+        # On create:
+        invalid_create = self.client.post(
+            f"/api/teams/{team_a.id}/tasks/",
+            {
+                "title": "Invalid Assignee Task",
+                "assigned_to": str(self.member2.id),
+                "status": "pending",
+            },
+            format="json",
+        )
+        self.assertEqual(invalid_create.status_code, 400)
+        self.assertIn("must be a team member", invalid_create.json()["message"].lower())
+
+        # On update:
+        invalid_update = self.client.patch(
+            f"/api/tasks/{task_id}/",
+            {"assigned_to": str(self.member2.id)},
+            format="json",
+        )
+        self.assertEqual(invalid_update.status_code, 400)
+        self.assertIn("must be a team member", invalid_update.json()["message"].lower())
+
+    def test_scenario_5_member_cross_team_access_denied(self):
+        """
+        Scenario 5: Member A belongs to Team B but tries to access Team A tasks.
+        - Access must be denied (404/403).
+        """
+        team_a = Team(
+            name="Audit Team S5 Team A",
+            created_by=self.admin,
+            members=[self.admin, self.member2],
+        )
+        team_a.save()
+
+        team_b = Team(
+            name="Audit Team S5 Team B",
+            created_by=self.admin,
+            members=[self.admin, self.member1],
+        )
+        team_b.save()
+
+        task_a = Task(
+            title="Team A Internal Task",
+            team=team_a,
+            created_by=self.admin,
+            status="pending",
+        )
+        task_a.save()
+
+        # Member 1 is in Team B, tries to access Team A's task
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.member1_token}")
+
+        # GET detail -> 404
+        get_resp = self.client.get(f"/api/tasks/{task_a.id}/")
+        self.assertEqual(get_resp.status_code, 404)
+
+        # PATCH detail -> 404
+        patch_resp = self.client.patch(f"/api/tasks/{task_a.id}/", {"status": "in_progress"})
+        self.assertEqual(patch_resp.status_code, 404)
+
+        # POST comment -> 404
+        comment_resp = self.client.post(
+            f"/api/tasks/{task_a.id}/comments/",
+            {"text": "Cross team comment"},
+            format="json",
+        )
+        self.assertEqual(comment_resp.status_code, 404)
+
+    def test_scenario_6_assigned_tasks_endpoint(self):
+        """
+        Scenario 6: Assigned Tasks endpoint (GET /api/tasks/assigned-to-me/):
+        - Returns the current user's assigned tasks only.
+        - Does not return unassigned tasks.
+        - Does not return other users' tasks.
+        - Tests assignment and reassignment reactivity.
+        """
+        team = Team(
+            name="Audit Team S6",
+            created_by=self.admin,
+            members=[self.admin, self.member1, self.member2],
+        )
+        team.save()
+
+        # 1. Initially Member 1 has NO assigned tasks
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.member1_token}")
+        init_resp = self.client.get("/api/tasks/assigned-to-me/")
+        self.assertEqual(init_resp.status_code, 200)
+        self.assertEqual(init_resp.json(), [])
+
+        # Create 3 tasks:
+        # Task 1: Assigned to Member 1
+        task_1 = Task(
+            title="Task For Member 1",
+            team=team,
+            created_by=self.admin,
+            assigned_to=self.member1,
+            status="pending",
+        )
+        task_1.save()
+
+        # Task 2: Assigned to Member 2
+        task_2 = Task(
+            title="Task For Member 2",
+            team=team,
+            created_by=self.admin,
+            assigned_to=self.member2,
+            status="pending",
+        )
+        task_2.save()
+
+        # Task 3: Unassigned
+        task_3 = Task(
+            title="Task Unassigned",
+            team=team,
+            created_by=self.admin,
+            assigned_to=None,
+            status="pending",
+        )
+        task_3.save()
+
+        # 2. Member 1 queries /api/tasks/assigned-to-me/
+        m1_resp = self.client.get("/api/tasks/assigned-to-me/")
+        self.assertEqual(m1_resp.status_code, 200)
+        m1_tasks = m1_resp.json()
+        self.assertEqual(len(m1_tasks), 1)
+        self.assertEqual(m1_tasks[0]["id"], str(task_1.id))
+        self.assertEqual(m1_tasks[0]["title"], "Task For Member 1")
+
+        # 3. Member 2 queries /api/tasks/assigned-to-me/
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.member2_token}")
+        m2_resp = self.client.get("/api/tasks/assigned-to-me/")
+        self.assertEqual(m2_resp.status_code, 200)
+        m2_tasks = m2_resp.json()
+        self.assertEqual(len(m2_tasks), 1)
+        self.assertEqual(m2_tasks[0]["id"], str(task_2.id))
+        self.assertEqual(m2_tasks[0]["title"], "Task For Member 2")
+
+        # 4. Admin reassigns Task 1 from Member 1 to Member 2
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.admin_token}")
+        reassign_resp = self.client.patch(
+            f"/api/tasks/{task_1.id}/",
+            {"assigned_to": str(self.member2.id)},
+            format="json",
+        )
+        self.assertEqual(reassign_resp.status_code, 200)
+
+        # 5. Member 1's assigned list is now empty
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.member1_token}")
+        m1_after_resp = self.client.get("/api/tasks/assigned-to-me/")
+        self.assertEqual(m1_after_resp.status_code, 200)
+        self.assertEqual(len(m1_after_resp.json()), 0)
+
+        # 6. Member 2's assigned list now has both Task 2 and Task 1
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.member2_token}")
+        m2_after_resp = self.client.get("/api/tasks/assigned-to-me/")
+        self.assertEqual(m2_after_resp.status_code, 200)
+        m2_after_tasks = m2_after_resp.json()
+        self.assertEqual(len(m2_after_tasks), 2)
+        task_ids = [t["id"] for t in m2_after_tasks]
+        self.assertIn(str(task_1.id), task_ids)
+        self.assertIn(str(task_2.id), task_ids)
+
 

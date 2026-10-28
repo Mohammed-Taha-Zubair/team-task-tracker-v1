@@ -326,7 +326,7 @@ function MemberDashboardView({ user }) {
       setLoading(true);
       const [teamsRes, tasksRes, actRes] = await Promise.all([
         api.get("/api/teams/"),
-        api.get("/api/tasks/?assigned=me"),
+        api.get("/api/tasks/assigned-to-me/"),
         api.get("/api/activities/"),
       ]);
       setTeams(teamsRes || []);
