@@ -34,11 +34,14 @@ def format_task(task):
         created_by_data = None
 
     team_id = None
+    team_name = None
     try:
         if task.team and hasattr(task.team, "id"):
             team_id = str(task.team.id)
+            team_name = getattr(task.team, "name", "Team")
     except Exception:
         team_id = None
+        team_name = None
 
     return {
         "id": str(task.id),
@@ -48,6 +51,7 @@ def format_task(task):
         "created_by": created_by_data,
         "status": task.status,
         "team_id": team_id,
+        "team_name": team_name,
         "created_at": task.created_at.isoformat() if task.created_at else None,
         "updated_at": task.updated_at.isoformat() if task.updated_at else None,
     }
@@ -64,6 +68,39 @@ def get_task_and_team_or_error(task_id, user):
 
     team = get_team_or_error(str(task.team.id), user)
     return task, team
+
+
+# GET /api/tasks/ : List tasks for current user (Superadmin sees all, Admin/Member see their teams)
+# Query params: status (pending/in_progress/done), assigned=me, limit
+class TaskListAllView(APIView):
+    def get(self, request):
+        from apps.teams.models import Team
+
+        is_super = getattr(request.user, "is_superadmin", False)
+
+        query = {}
+        status_filter = request.query_params.get("status")
+        if status_filter and status_filter.strip().lower() in ["pending", "in_progress", "done"]:
+            query["status"] = status_filter.strip().lower()
+
+        assigned_filter = request.query_params.get("assigned")
+        if assigned_filter == "me":
+            query["assigned_to"] = request.user
+
+        if is_super:
+            tasks = Task.objects(**query).order_by("-updated_at")
+        else:
+            user_teams = Team.objects(members=request.user)
+            if not user_teams:
+                return Response([], status=status.HTTP_200_OK)
+            query["team__in"] = user_teams
+            tasks = Task.objects(**query).order_by("-updated_at")
+
+        limit = request.query_params.get("limit")
+        if limit and limit.isdigit():
+            tasks = tasks[:int(limit)]
+
+        return Response([format_task(t) for t in tasks], status=status.HTTP_200_OK)
 
 
 # POST /api/teams/<id>/tasks/: Create a task in a team (Admins and Superadmins only)

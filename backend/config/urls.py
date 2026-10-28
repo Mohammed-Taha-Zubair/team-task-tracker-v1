@@ -1,11 +1,13 @@
 from django.urls import path, include
 from apps.users.views import UserListCreateView, UserDetailView
+from apps.activity.views import GlobalActivityView
 
 # Top-level URL routing for the project: includes each app's urls.py
 urlpatterns = [
     path("api/auth/", include("apps.users.urls")),
     path("api/teams/", include("apps.teams.urls")),
     path("api/teams/", include("apps.activity.urls")),
+    path("api/activities/", GlobalActivityView.as_view(), name="global-activities"),
     path("api/", include("apps.tasks.urls")),
     # Admin-only user management
     path("api/users/", UserListCreateView.as_view(), name="user-list-create"),

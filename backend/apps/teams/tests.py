@@ -740,3 +740,44 @@ class ComprehensiveAuditTestSuite(SimpleTestCase):
         resp_log = log_mw(req_log)
         self.assertEqual(resp_log.status_code, 200)
         self.assertEqual(resp_log.content.decode(), "logged")
+
+    def test_task_list_all_and_global_activity_endpoints(self):
+        """Verify GET /api/tasks/ and GET /api/activities/ work across roles."""
+        team = Team(
+            name="Audit Global Overview",
+            created_by=self.admin,
+            members=[self.admin, self.member1],
+        )
+        team.save()
+
+        task1 = Task(
+            title="Global Task 1",
+            team=team,
+            created_by=self.admin,
+            assigned_to=self.member1,
+            status="pending",
+        )
+        task1.save()
+
+        # 1. Member queries their assigned tasks
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.member1_token}")
+        resp_assigned = self.client.get("/api/tasks/?assigned=me")
+        self.assertEqual(resp_assigned.status_code, 200)
+        self.assertEqual(len(resp_assigned.json()), 1)
+        self.assertEqual(resp_assigned.json()[0]["id"], str(task1.id))
+
+        # 2. Member queries all team tasks with status filter
+        resp_status = self.client.get("/api/tasks/?status=pending")
+        self.assertEqual(resp_status.status_code, 200)
+        self.assertTrue(any(t["id"] == str(task1.id) for t in resp_status.json()))
+
+        # 3. Superadmin queries all tasks globally
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.superadmin_token}")
+        resp_super = self.client.get("/api/tasks/")
+        self.assertEqual(resp_super.status_code, 200)
+        self.assertTrue(any(t["id"] == str(task1.id) for t in resp_super.json()))
+
+        # 4. Global activities endpoint
+        resp_act = self.client.get("/api/activities/")
+        self.assertEqual(resp_act.status_code, 200)
+        self.assertIsInstance(resp_act.json(), list)
