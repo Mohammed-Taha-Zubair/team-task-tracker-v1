@@ -616,3 +616,42 @@ class ComprehensiveAuditTestSuite(SimpleTestCase):
         self.assertFalse(app_admin_login)
 
         dj_super.delete()
+
+    def test_custom_middlewares_execution(self):
+        """Verify custom JWT, Role Access Control, and Logging middlewares execute properly."""
+        from django.test import RequestFactory
+        from django.http import HttpResponse
+        from apps.common.middleware import (
+            JWTAuthenticationMiddleware,
+            RoleAccessControlMiddleware,
+            RequestLoggingMiddleware,
+        )
+
+        factory = RequestFactory()
+
+        # 1. Test JWTAuthenticationMiddleware attaches user
+        jwt_mw = JWTAuthenticationMiddleware(lambda req: HttpResponse(f"user:{getattr(req.user, 'email', None)}"))
+        req = factory.get("/api/auth/me/", HTTP_AUTHORIZATION=f"Bearer {self.admin_token}")
+        resp = jwt_mw(req)
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("user:auditadmin@example.com", resp.content.decode())
+
+        # 2. Test RoleAccessControlMiddleware blocks non-superadmin from /api/users/
+        role_mw = RoleAccessControlMiddleware(lambda req: HttpResponse("ok"))
+        req_admin = factory.get("/api/users/")
+        req_admin.user = self.admin
+        resp_admin = role_mw(req_admin)
+        self.assertEqual(resp_admin.status_code, 403)
+
+        req_super = factory.get("/api/users/")
+        req_super.user = self.superadmin
+        resp_super = role_mw(req_super)
+        self.assertEqual(resp_super.status_code, 200)
+
+        # 3. Test RequestLoggingMiddleware passes through response cleanly
+        log_mw = RequestLoggingMiddleware(lambda req: HttpResponse("logged"))
+        req_log = factory.get("/api/teams/")
+        req_log.user = self.admin
+        resp_log = log_mw(req_log)
+        self.assertEqual(resp_log.status_code, 200)
+        self.assertEqual(resp_log.content.decode(), "logged")
