@@ -8,6 +8,7 @@ from apps.tasks.models import Task, Comment
 from apps.users.models import User
 from apps.common.utils import get_team_or_error
 from apps.activity.services import log_activity
+from apps.common.permissions import CanCreateTask
 
 
 # Helper to format a Task object with assigned_to as {id, name}
@@ -65,10 +66,21 @@ def get_task_and_team_or_error(task_id, user):
     return task, team
 
 
-# POST /api/teams/<id>/tasks/: Create a task in a team (team members only)
-# GET /api/teams/<id>/tasks/?status=pending : List tasks of the team (newest updated first)
+# POST /api/teams/<id>/tasks/: Create a task in a team (Admins and Superadmins only)
+# GET /api/teams/<id>/tasks/?status=pending : List tasks of the team (team members, newest updated first)
 class TeamTaskListCreateView(APIView):
+    def get_permissions(self):
+        if self.request.method == "POST":
+            return [CanCreateTask()]
+        return super().get_permissions()
+
     def post(self, request, id):
+        if not getattr(request.user, "is_admin_or_superadmin", False):
+            return Response(
+                {"message": "Only admins and superadmins can create tasks"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
         team = get_team_or_error(id, request.user)
 
         title = request.data.get("title", "").strip()
@@ -153,6 +165,7 @@ class TeamTaskListCreateView(APIView):
 
 
 # GET /api/tasks/<id>/ and PATCH /api/tasks/<id>/ (team members only)
+# Members can only update status. Title, description, and assignee can only be modified by admins.
 class TaskDetailView(APIView):
     def get(self, request, id):
         task, team = get_task_and_team_or_error(id, request.user)
@@ -160,6 +173,22 @@ class TaskDetailView(APIView):
 
     def patch(self, request, id):
         task, team = get_task_and_team_or_error(id, request.user)
+
+        is_admin = getattr(request.user, "is_admin_or_superadmin", False)
+
+        # Members can only change task status
+        if not is_admin:
+            disallowed = [f for f in ["title", "description", "assigned_to"] if f in request.data]
+            if disallowed:
+                return Response(
+                    {
+                        "message": (
+                            "Members can only change task status. "
+                            f"Modifying {', '.join(disallowed)} requires admin access."
+                        )
+                    },
+                    status=status.HTTP_403_FORBIDDEN,
+                )
 
         old_status = task.status
         status_changed = False

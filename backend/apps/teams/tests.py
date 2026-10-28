@@ -384,7 +384,7 @@ class ComprehensiveAuditTestSuite(SimpleTestCase):
     # ---------------------------------------------------------
 
     def test_create_task_with_created_by(self):
-        """Verify creating task sets created_by and status."""
+        """Verify creating task by Admin sets created_by and status."""
         team = Team(
             name="Audit Team Tasks",
             created_by=self.admin,
@@ -392,7 +392,7 @@ class ComprehensiveAuditTestSuite(SimpleTestCase):
         )
         team.save()
 
-        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.member1_token}")
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.admin_token}")
         resp = self.client.post(
             f"/api/teams/{team.id}/tasks/",
             {
@@ -406,11 +406,32 @@ class ComprehensiveAuditTestSuite(SimpleTestCase):
         self.assertEqual(resp.status_code, 201)
         data = resp.json()
         self.assertEqual(data["title"], "Build Authentication")
-        self.assertEqual(data["created_by"]["id"], str(self.member1.id))
+        self.assertEqual(data["created_by"]["id"], str(self.admin.id))
         self.assertEqual(data["assigned_to"]["id"], str(self.member1.id))
 
-    def test_update_task_details_and_status(self):
-        """Verify task status and title update."""
+    def test_member_cannot_create_task(self):
+        """Verify a MEMBER cannot create tasks."""
+        team = Team(
+            name="Audit Team Member No Create",
+            created_by=self.admin,
+            members=[self.admin, self.member1],
+        )
+        team.save()
+
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.member1_token}")
+        resp = self.client.post(
+            f"/api/teams/{team.id}/tasks/",
+            {
+                "title": "Unauthorized Task",
+                "description": "Should fail",
+                "status": "pending",
+            },
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 403)
+
+    def test_update_task_details_and_status_by_admin(self):
+        """Verify Admin can update task status and title."""
         team = Team(
             name="Audit Team Update",
             created_by=self.admin,
@@ -425,7 +446,7 @@ class ComprehensiveAuditTestSuite(SimpleTestCase):
         )
         task.save()
 
-        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.member1_token}")
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.admin_token}")
         resp = self.client.patch(
             f"/api/tasks/{task.id}/",
             {
@@ -438,6 +459,71 @@ class ComprehensiveAuditTestSuite(SimpleTestCase):
         data = resp.json()
         self.assertEqual(data["title"], "Updated Title")
         self.assertEqual(data["status"], "in_progress")
+
+    def test_member_cannot_modify_task_title_description_assignee(self):
+        """Verify a MEMBER cannot change title, description, or assignee on a task."""
+        team = Team(
+            name="Audit Team Member Restrict",
+            created_by=self.admin,
+            members=[self.admin, self.member1],
+        )
+        team.save()
+        task = Task(
+            title="Member Cant Touch Title",
+            description="Original description",
+            team=team,
+            created_by=self.admin,
+            assigned_to=self.admin,
+            status="pending",
+        )
+        task.save()
+
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.member1_token}")
+
+        # Attempt to change title
+        resp1 = self.client.patch(f"/api/tasks/{task.id}/", {"title": "Hacked Title"})
+        self.assertEqual(resp1.status_code, 403)
+
+        # Attempt to change description
+        resp2 = self.client.patch(f"/api/tasks/{task.id}/", {"description": "Hacked Desc"})
+        self.assertEqual(resp2.status_code, 403)
+
+        # Attempt to change assignee
+        resp3 = self.client.patch(f"/api/tasks/{task.id}/", {"assigned_to": str(self.member1.id)})
+        self.assertEqual(resp3.status_code, 403)
+
+    def test_member_can_update_status_and_comment(self):
+        """Verify a MEMBER can change status (pending/in_progress/done) and add comments."""
+        team = Team(
+            name="Audit Team Member Status",
+            created_by=self.admin,
+            members=[self.admin, self.member1],
+        )
+        team.save()
+        task = Task(
+            title="Allowed Status Change Task",
+            team=team,
+            created_by=self.admin,
+            status="pending",
+        )
+        task.save()
+
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.member1_token}")
+
+        # 1. Member changes status to in_progress
+        resp1 = self.client.patch(f"/api/tasks/{task.id}/", {"status": "in_progress"})
+        self.assertEqual(resp1.status_code, 200)
+        self.assertEqual(resp1.json()["status"], "in_progress")
+
+        # 2. Member changes status to done
+        resp2 = self.client.patch(f"/api/tasks/{task.id}/", {"status": "done"})
+        self.assertEqual(resp2.status_code, 200)
+        self.assertEqual(resp2.json()["status"], "done")
+
+        # 3. Member adds a comment
+        resp3 = self.client.post(f"/api/tasks/{task.id}/comments/", {"text": "Member comment here"})
+        self.assertEqual(resp3.status_code, 201)
+        self.assertEqual(resp3.json()["text"], "Member comment here")
 
     def test_reject_assignment_to_non_team_member(self):
         """Verify assigning task to a user who is not in the team is rejected."""
@@ -508,17 +594,18 @@ class ComprehensiveAuditTestSuite(SimpleTestCase):
         team = Team(name="Audit Team Timeline", created_by=self.admin, members=[self.admin, self.member1])
         team.save()
 
-        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.member1_token}")
-
-        # 1. Create task -> action_type = task_created
+        # 1. Admin creates task -> action_type = task_created
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.admin_token}")
         create_resp = self.client.post(
             f"/api/teams/{team.id}/tasks/",
             {"title": "Task 1", "status": "pending"},
             format="json",
         )
+        self.assertEqual(create_resp.status_code, 201)
         task_id = create_resp.json()["id"]
 
-        # 2. Update status -> action_type = status_changed
+        # 2. Member updates status -> action_type = status_changed
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.member1_token}")
         self.client.patch(
             f"/api/tasks/{task_id}/",
             {"status": "in_progress"},

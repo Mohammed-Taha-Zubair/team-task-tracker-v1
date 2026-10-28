@@ -1,10 +1,16 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/api";
 import { formatRelativeTime } from "@/lib/utils";
 
 export default function TaskEditForm({ task, members = [], onTaskSaved }) {
+  const { user } = useAuth();
+  const canManageTaskDetails =
+    (user?.role || "").toUpperCase() === "ADMIN" ||
+    (user?.role || "").toUpperCase() === "SUPERADMIN";
+
   const [title, setTitle] = useState(task?.title || "");
   const [description, setDescription] = useState(task?.description || "");
   const [status, setStatus] = useState(task?.status || "pending");
@@ -23,7 +29,7 @@ export default function TaskEditForm({ task, members = [], onTaskSaved }) {
 
   const handleSave = async (e) => {
     e.preventDefault();
-    if (!title.trim()) {
+    if (canManageTaskDetails && !title.trim()) {
       setSaveMessage({ type: "error", text: "Task title cannot be empty." });
       return;
     }
@@ -32,14 +38,20 @@ export default function TaskEditForm({ task, members = [], onTaskSaved }) {
     setSaveMessage(null);
 
     try {
-      const updated = await api.patch(`/api/tasks/${task.id}/`, {
-        title: title.trim(),
-        description: description.trim(),
-        status,
-        assigned_to: assignedTo || null,
-      });
+      const payload = canManageTaskDetails
+        ? {
+            title: title.trim(),
+            description: description.trim(),
+            status,
+            assigned_to: assignedTo || null,
+          }
+        : {
+            status,
+          };
 
-      setSaveMessage({ type: "success", text: "Task updated successfully!" });
+      const updated = await api.patch(`/api/tasks/${task.id}/`, payload);
+
+      setSaveMessage({ type: "success", text: canManageTaskDetails ? "Task updated successfully!" : "Task status updated successfully!" });
       if (onTaskSaved) {
         onTaskSaved(updated);
       }
@@ -113,17 +125,25 @@ export default function TaskEditForm({ task, members = [], onTaskSaved }) {
         </div>
       )}
 
+      {!canManageTaskDetails && (
+        <div className="mt-4 p-3 bg-amber-50/80 border border-amber-200/80 text-amber-800 rounded-lg text-xs flex items-center gap-2">
+          <span className="font-semibold shrink-0">Member Permissions:</span>
+          <span>You can update the task status below and leave comments. Task title, description, and assignment can only be modified by team admins.</span>
+        </div>
+      )}
+
       <form onSubmit={handleSave} className="mt-6 space-y-4">
         <div>
           <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-            Title <span className="text-red-500">*</span>
+            Title {canManageTaskDetails && <span className="text-red-500">*</span>}
           </label>
           <input
             type="text"
-            required
+            required={canManageTaskDetails}
+            disabled={!canManageTaskDetails}
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="w-full px-3.5 py-2.5 bg-white text-slate-900 border border-slate-300 rounded-lg text-sm shadow-2xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition placeholder:text-slate-400"
+            className="w-full px-3.5 py-2.5 bg-white text-slate-900 border border-slate-300 rounded-lg text-sm shadow-2xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition placeholder:text-slate-400 disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed"
           />
         </div>
 
@@ -133,22 +153,23 @@ export default function TaskEditForm({ task, members = [], onTaskSaved }) {
           </label>
           <textarea
             rows={4}
+            disabled={!canManageTaskDetails}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder="Task details and instructions..."
-            className="w-full px-3.5 py-2.5 bg-white text-slate-900 border border-slate-300 rounded-lg text-sm shadow-2xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition resize-none placeholder:text-slate-400"
+            className="w-full px-3.5 py-2.5 bg-white text-slate-900 border border-slate-300 rounded-lg text-sm shadow-2xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition resize-none placeholder:text-slate-400 disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed"
           />
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-              Status
+              Status {canManageTaskDetails ? "" : "(You can change this)"}
             </label>
             <select
               value={status}
               onChange={(e) => setStatus(e.target.value)}
-              className="w-full px-3.5 py-2.5 bg-white text-slate-900 border border-slate-300 rounded-lg text-sm shadow-2xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition"
+              className="w-full px-3.5 py-2.5 bg-white text-slate-900 border border-slate-300 rounded-lg text-sm shadow-2xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition ring-1 ring-indigo-500/20"
             >
               <option value="pending">Pending</option>
               <option value="in_progress">In Progress</option>
@@ -162,8 +183,9 @@ export default function TaskEditForm({ task, members = [], onTaskSaved }) {
             </label>
             <select
               value={assignedTo}
+              disabled={!canManageTaskDetails}
               onChange={(e) => setAssignedTo(e.target.value)}
-              className="w-full px-3.5 py-2.5 bg-white text-slate-900 border border-slate-300 rounded-lg text-sm shadow-2xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition"
+              className="w-full px-3.5 py-2.5 bg-white text-slate-900 border border-slate-300 rounded-lg text-sm shadow-2xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed"
             >
               <option value="">Unassigned</option>
               {(members || []).filter(Boolean).map((member) => (
@@ -181,7 +203,11 @@ export default function TaskEditForm({ task, members = [], onTaskSaved }) {
             disabled={saving}
             className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white text-xs font-semibold rounded-lg shadow-xs transition disabled:opacity-50 cursor-pointer"
           >
-            {saving ? "Saving Changes..." : "Save Changes"}
+            {saving
+              ? "Saving..."
+              : canManageTaskDetails
+              ? "Save Changes"
+              : "Update Status"}
           </button>
         </div>
       </form>
