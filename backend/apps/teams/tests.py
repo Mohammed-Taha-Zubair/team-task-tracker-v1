@@ -88,7 +88,6 @@ class ComprehensiveAuditTestSuite(SimpleTestCase):
         superadmin = User(name="Super", email="super@example.com", password="hash", role="SUPERADMIN")
         admin = User(name="Admin", email="admin@example.com", password="hash", role="ADMIN")
         member = User(name="Member", email="member@example.com", password="hash", role="MEMBER")
-        legacy = User(name="Legacy", email="legacy@example.com", password="hash", role="admin")
 
         self.assertTrue(superadmin.is_superadmin)
         self.assertTrue(superadmin.is_admin_or_superadmin)
@@ -96,7 +95,6 @@ class ComprehensiveAuditTestSuite(SimpleTestCase):
         self.assertFalse(admin.is_superadmin)
         self.assertTrue(member.is_member)
         self.assertFalse(member.is_admin_or_superadmin)
-        self.assertEqual(legacy.to_dict()["role"], "ADMIN")
 
     def test_successful_registration(self):
         """Verify successful registration returns 201 and creates a member."""

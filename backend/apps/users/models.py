@@ -15,8 +15,7 @@ class User(Document):
     name = StringField(required=True, max_length=100)
     email = EmailField(required=True, unique=True)
     password = StringField(required=True)
-    # Include legacy lowercase choices so existing records load without ValidationError
-    role = StringField(choices=["SUPERADMIN", "ADMIN", "MEMBER", "admin", "member"], default="MEMBER")
+    role = StringField(choices=ROLE_CHOICES, default="MEMBER")
     created_at = DateTimeField(default=datetime.utcnow)
 
     # Required by DRF's authentication mechanism
@@ -26,15 +25,15 @@ class User(Document):
 
     @property
     def is_superadmin(self):
-        return (self.role or "").upper() == "SUPERADMIN"
+        return self.role == "SUPERADMIN"
 
     @property
     def is_admin_or_superadmin(self):
-        return (self.role or "").upper() in ["ADMIN", "SUPERADMIN"]
+        return self.role in ["ADMIN", "SUPERADMIN"]
 
     @property
     def is_member(self):
-        return (self.role or "").upper() == "MEMBER"
+        return self.role == "MEMBER"
 
     # Convert document to plain Python dictionary (never exposes password)
     def to_dict(self):
@@ -42,6 +41,6 @@ class User(Document):
             "id": str(self.id),
             "name": self.name,
             "email": self.email,
-            "role": (self.role or "MEMBER").upper(),
+            "role": self.role,
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }
