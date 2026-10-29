@@ -25,12 +25,16 @@ INSTALLED_APPS = [
     "apps.activity",
 ]
 
-# Minimal middleware without sessions, auth, or messages
+# Middleware: CORS, Security, and Custom Django Middlewares
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    # Custom Application Middlewares
+    "apps.common.middleware.JWTAuthenticationMiddleware",
+    "apps.common.middleware.RoleAccessControlMiddleware",
+    "apps.common.middleware.RequestLoggingMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"
@@ -53,7 +57,7 @@ WSGI_APPLICATION = "config.wsgi.application"
 # No Django relational database - MongoDB is used exclusively
 DATABASES = {}
 
-# MongoDB connection using mongoengine
+# MongoDB connection using mongoengine for all application domain entities
 MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017/team_task_tracker")
 mongoengine.connect(host=MONGO_URI)
 

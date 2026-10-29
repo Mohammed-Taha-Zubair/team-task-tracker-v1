@@ -12,12 +12,20 @@ def get_team_or_error(team_id, user):
     if not team:
         raise NotFound("Team not found")
 
-    is_member = any(
-        str(member.id) == str(user.id)
-        for member in team.members
-        if member
-    )
+    # Superadmin has global access across all teams
+    if getattr(user, "is_superadmin", False):
+        return team
+
+    is_member = False
+    for member in (team.members or []):
+        try:
+            if member and str(getattr(member, "id", None)) == str(user.id):
+                is_member = True
+                break
+        except Exception:
+            continue
+
     if not is_member:
-        raise PermissionDenied("You are not a member of this team")
+        raise NotFound("Team not found")
 
     return team

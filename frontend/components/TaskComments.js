@@ -1,17 +1,28 @@
 "use client";
 
 import { useState } from "react";
+import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/api";
 import { formatRelativeTime } from "@/lib/utils";
 
-export default function TaskComments({ taskId, comments = [], loading, onCommentAdded }) {
+export default function TaskComments({ taskId, task, comments = [], loading, onCommentAdded }) {
+  const { user } = useAuth();
+  const role = (user?.role || "").toUpperCase();
+  const isAdminOrSuper = role === "ADMIN" || role === "SUPERADMIN";
+  const isAssigned = Boolean(
+    task?.assigned_to?.id &&
+    user?.id &&
+    String(task.assigned_to.id) === String(user.id)
+  );
+  const canComment = isAdminOrSuper || isAssigned;
+
   const [commentText, setCommentText] = useState("");
   const [postingComment, setPostingComment] = useState(false);
   const [commentError, setCommentError] = useState("");
 
   const handleAddComment = async (e) => {
     e.preventDefault();
-    if (!commentText.trim()) return;
+    if (!canComment || !commentText.trim()) return;
 
     setPostingComment(true);
     setCommentError("");
@@ -48,6 +59,15 @@ export default function TaskComments({ taskId, comments = [], loading, onComment
 
       {/* Add Comment Form */}
       <form onSubmit={handleAddComment} className="mt-5">
+        {!canComment && (
+          <div className="mb-3 p-3 bg-slate-50 border border-slate-200 text-slate-600 rounded-lg text-xs font-medium flex items-center space-x-2">
+            <svg className="w-4 h-4 text-slate-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span>This task is not assigned to you. You have read-only access.</span>
+          </div>
+        )}
+
         {commentError && (
           <div className="mb-3 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-xs font-medium">
             {commentError}
@@ -57,20 +77,28 @@ export default function TaskComments({ taskId, comments = [], loading, onComment
           <label className="sr-only">Leave a comment</label>
           <textarea
             rows={3}
-            required
+            disabled={!canComment}
             value={commentText}
             onChange={(e) => setCommentText(e.target.value)}
-            placeholder="Write a comment or status update..."
-            className="w-full px-3.5 py-2.5 bg-white text-slate-900 border border-slate-300 rounded-lg text-sm shadow-2xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition resize-none placeholder:text-slate-400"
+            placeholder={
+              canComment
+                ? "Write a comment or status update..."
+                : "Comments are disabled because this task is not assigned to you."
+            }
+            className="w-full px-3.5 py-2.5 bg-white text-slate-900 border border-slate-300 rounded-lg text-sm shadow-2xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition resize-none placeholder:text-slate-400 disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
           />
         </div>
         <div className="mt-2.5 flex justify-end">
           <button
             type="submit"
-            disabled={postingComment || !commentText.trim()}
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white text-xs font-semibold rounded-lg shadow-xs transition disabled:opacity-50 cursor-pointer"
+            disabled={!canComment || postingComment || !commentText.trim()}
+            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white text-xs font-semibold rounded-lg shadow-xs transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
           >
-            {postingComment ? "Posting..." : "Post Comment"}
+            {!canComment
+              ? "Comments Disabled"
+              : postingComment
+              ? "Posting..."
+              : "Post Comment"}
           </button>
         </div>
       </form>

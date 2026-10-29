@@ -9,21 +9,13 @@ from apps.users.authentication import generate_access_token, generate_refresh_to
 
 
 # POST /api/auth/register/
-# Bootstrap endpoint: only works when there are zero users in the DB.
-# Once an admin exists, this returns 403. All future user creation goes through
-# the admin-only POST /api/users/ endpoint below.
+# Public registration: open to any user, always creates a MEMBER account.
+# Users can never self-assign the admin role.
 class RegisterView(APIView):
     authentication_classes = []
     permission_classes = []
 
     def post(self, request):
-        # Allow registration only if no users exist yet (first admin bootstrap)
-        if User.objects.count() > 0:
-            return Response(
-                {"message": "Registration is disabled. Contact your administrator to get access."},
-                status=status.HTTP_403_FORBIDDEN,
-            )
-
         name = request.data.get("name", "").strip()
         email = request.data.get("email", "").strip().lower()
         password = request.data.get("password", "")
@@ -34,24 +26,38 @@ class RegisterView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        import re
+        if not re.match(r"^[\w\.\+\-]+@[\w\.\-]+\.[a-zA-Z]{2,}$", email):
+            return Response(
+                {"message": "Invalid email format"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if len(password) < 8:
+            return Response(
+                {"message": "Password must be at least 8 characters long"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         if User.objects(email=email).first():
             return Response(
                 {"message": "Email is already registered"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # First user is always admin
+        # Public registration ALWAYS creates a member account.
+        # Any requested "role" in request.data is strictly ignored.
         user = User(
             name=name,
             email=email,
             password=make_password(password),
-            role="admin",
+            role="MEMBER",
         )
         user.save()
 
         return Response(
             {
-                "message": "Admin account created successfully",
+                "message": "User registered successfully",
                 "user": user.to_dict(),
             },
             status=status.HTTP_201_CREATED,
@@ -149,13 +155,13 @@ class MeView(APIView):
         )
 
 
-from apps.common.permissions import IsAdmin
+from apps.common.permissions import IsSuperAdmin
 
 
-# GET  /api/users/       — list all users (admin only)
-# POST /api/users/       — create a new user (admin only, members only)
+# GET  /api/users/       — list all users (superadmin only)
+# POST /api/users/       — create a new user (superadmin only: ADMIN or MEMBER)
 class UserListCreateView(APIView):
-    permission_classes = [IsAdmin]
+    permission_classes = [IsSuperAdmin]
 
     def get(self, request):
         users = [u.to_dict() for u in User.objects.all()]
@@ -165,7 +171,7 @@ class UserListCreateView(APIView):
         name = request.data.get("name", "").strip()
         email = request.data.get("email", "").strip().lower()
         password = request.data.get("password", "")
-        role = request.data.get("role", "member").strip().lower()
+        role = request.data.get("role", "MEMBER").strip().upper()
 
         if not name or not email or not password:
             return Response(
@@ -173,16 +179,15 @@ class UserListCreateView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Enforce single super admin policy: all created users must be members
-        if role == "admin":
+        if role == "SUPERADMIN":
             return Response(
-                {"message": "Only one super admin is allowed. New users must be created as members."},
+                {"message": "Superadmin accounts can only be created via management commands"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        if role != "member":
+        if role not in ["ADMIN", "MEMBER"]:
             return Response(
-                {"message": "Role must be 'member'"},
+                {"message": "Role must be 'ADMIN' or 'MEMBER'"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -196,7 +201,7 @@ class UserListCreateView(APIView):
             name=name,
             email=email,
             password=make_password(password),
-            role="member",
+            role=role,
         )
         user.save()
 
@@ -206,9 +211,10 @@ class UserListCreateView(APIView):
         )
 
 
-# DELETE /api/users/<user_id>/  — delete a user (admin only, cannot delete self)
+# DELETE /api/users/<user_id>/  — delete a user (superadmin only, cannot delete self)
+# PATCH  /api/users/<user_id>/  — update details or promote/demote (superadmin only)
 class UserDetailView(APIView):
-    permission_classes = [IsAdmin]
+    permission_classes = [IsSuperAdmin]
 
     def delete(self, request, user_id):
         if str(request.user.id) == str(user_id):
@@ -224,11 +230,39 @@ class UserDetailView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
+        # Cascade clean up references to prevent dangling DBRefs
+        try:
+            from apps.teams.models import Team
+            from apps.tasks.models import Task
+            from mongoengine.connection import get_db
+
+            # 1. Pull user from all team member lists
+            Team.objects.update(pull__members=user)
+            db = get_db()
+            db.teams.update_many({}, {"$pull": {"members": user.id}})
+
+            # 2. Unassign tasks assigned to this user
+            Task.objects(assigned_to=user).update(set__assigned_to=None)
+            db.tasks.update_many({"assigned_to": user.id}, {"$set": {"assigned_to": None}})
+
+            # 3. If user created teams, transfer ownership to admin
+            Team.objects(created_by=user).update(set__created_by=request.user)
+            db.teams.update_many({"created_by": user.id}, {"$set": {"created_by": request.user.id}})
+        except Exception as e:
+            print(f"Cleanup warning on user deletion: {e}")
+
         user.delete()
         return Response({"message": "User deleted successfully"}, status=status.HTTP_200_OK)
 
     def patch(self, request, user_id):
-        """Allow admin to update a user's name, email, or password."""
+        """Allow superadmin to update a user's name, email, password, or role."""
+        from bson import ObjectId
+        if not ObjectId.is_valid(user_id):
+            return Response(
+                {"message": "User not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
         user = User.objects(id=user_id).first()
         if not user:
             return Response(
@@ -236,28 +270,48 @@ class UserDetailView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        name = request.data.get("name", "").strip()
-        email = request.data.get("email", "").strip().lower()
-        password = request.data.get("password", "")
-        role = request.data.get("role", "").strip().lower()
-
-        if role == "admin" and str(user.id) != str(request.user.id):
-            return Response(
-                {"message": "Only one super admin is allowed in the system."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        if name:
-            user.name = name
-        if email:
-            existing = User.objects(email=email).first()
-            if existing and str(existing.id) != str(user_id):
+        if "role" in request.data:
+            new_role = str(request.data.get("role", "")).strip().upper()
+            if new_role == "SUPERADMIN":
                 return Response(
-                    {"message": "Email already in use by another account"},
+                    {"message": "Superadmin role cannot be assigned via API"},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-            user.email = email
-        if password:
+            if new_role not in ["ADMIN", "MEMBER"]:
+                return Response(
+                    {"message": "Role must be 'ADMIN' or 'MEMBER'"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if str(request.user.id) == str(user_id) and user.is_superadmin and new_role != "SUPERADMIN":
+                return Response(
+                    {"message": "You cannot demote your own Superadmin account"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            user.role = new_role
+
+        if "name" in request.data:
+            name = request.data.get("name", "").strip()
+            if name:
+                user.name = name
+
+        if "email" in request.data:
+            email = request.data.get("email", "").strip().lower()
+            if email:
+                existing = User.objects(email=email).first()
+                if existing and str(existing.id) != str(user_id):
+                    return Response(
+                        {"message": "Email already in use by another account"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                user.email = email
+
+        if "password" in request.data:
+            password = request.data.get("password", "")
+            if len(password) < 8:
+                return Response(
+                    {"message": "Password must be at least 8 characters long"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
             user.password = make_password(password)
 
         user.save()

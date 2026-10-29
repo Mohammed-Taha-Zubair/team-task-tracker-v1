@@ -118,11 +118,15 @@ function TeamViewContent() {
                 loading={loadingTasks}
               />
 
-              <NewTaskForm
-                teamId={teamId}
-                members={team?.members || []}
-                onTaskCreated={handleTaskCreated}
-              />
+              {/* Only admins and superadmins can create tasks */}
+              {((user?.role || "").toUpperCase() === "ADMIN" ||
+                (user?.role || "").toUpperCase() === "SUPERADMIN") && (
+                <NewTaskForm
+                  teamId={teamId}
+                  members={team?.members || []}
+                  onTaskCreated={handleTaskCreated}
+                />
+              )}
             </div>
 
             <div className="lg:col-span-1 sticky top-20">

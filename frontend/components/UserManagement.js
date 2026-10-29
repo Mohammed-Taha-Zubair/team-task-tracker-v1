@@ -11,7 +11,7 @@ import { api } from "@/lib/api";
  *  - Create new users (admin sets name, email, password, role)
  *  - Delete users (cannot delete self)
  */
-export default function UserManagement({ currentUserId }) {
+export default function UserManagement({ currentUserId, onUserChanged }) {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -19,7 +19,7 @@ export default function UserManagement({ currentUserId }) {
 
   // Create-user form state
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ name: "", email: "", password: "", role: "member" });
+  const [form, setForm] = useState({ name: "", email: "", password: "", role: "MEMBER" });
   const [formError, setFormError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -62,14 +62,28 @@ export default function UserManagement({ currentUserId }) {
     setSubmitting(true);
     try {
       await api.post("/api/users/", form);
-      setForm({ name: "", email: "", password: "", role: "member" });
+      setForm({ name: "", email: "", password: "", role: "MEMBER" });
       setShowForm(false);
       flash(`User "${form.name}" created successfully`);
       await fetchUsers();
+      if (onUserChanged) onUserChanged();
     } catch (err) {
       setFormError(err?.message || "Failed to create user");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleRoleToggle = async (targetUser) => {
+    const currentRole = (targetUser.role || "").toUpperCase();
+    const nextRole = currentRole === "ADMIN" ? "MEMBER" : "ADMIN";
+    try {
+      await api.patch(`/api/users/${targetUser.id}/`, { role: nextRole });
+      flash(`Updated "${targetUser.name}" to ${nextRole}`);
+      await fetchUsers();
+      if (onUserChanged) onUserChanged();
+    } catch (err) {
+      setError(err?.message || "Failed to update role");
     }
   };
 
@@ -80,6 +94,7 @@ export default function UserManagement({ currentUserId }) {
       await api.delete(`/api/users/${userId}/`);
       flash(`User "${userName}" deleted`);
       await fetchUsers();
+      if (onUserChanged) onUserChanged();
     } catch (err) {
       setError(err?.message || "Failed to delete user");
     } finally {
@@ -184,14 +199,17 @@ export default function UserManagement({ currentUserId }) {
                 className="w-full px-3 py-2 bg-white text-slate-900 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 transition placeholder:text-slate-400"
               />
             </div>
+            <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Role</label>
-              <div className="w-full px-3 py-2 bg-slate-50 text-slate-700 border border-slate-200 rounded-lg text-sm font-medium flex items-center justify-between">
-                <span className="flex items-center space-x-1.5">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                  <span>Member</span>
-                </span>
-                <span className="text-[11px] text-slate-400 font-normal">Single Super Admin Policy</span>
-              </div>
+              <select
+                id="new-user-role"
+                value={form.role}
+                onChange={(e) => setForm({ ...form, role: e.target.value })}
+                className="w-full px-3 py-2 bg-white text-slate-900 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 transition"
+              >
+                <option value="MEMBER">Member (Team Collaborator)</option>
+                <option value="ADMIN">Admin (Team Creator & Manager)</option>
+              </select>
             </div>
           </div>
           <div className="flex justify-end pt-1">
@@ -201,7 +219,7 @@ export default function UserManagement({ currentUserId }) {
               disabled={submitting}
               className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold rounded-lg shadow-xs transition disabled:opacity-50"
             >
-              {submitting ? "Creating..." : "Create Member"}
+              {submitting ? "Creating..." : `Create ${form.role === "ADMIN" ? "Admin" : "Member"}`}
             </button>
           </div>
         </form>
@@ -247,24 +265,37 @@ export default function UserManagement({ currentUserId }) {
                   <td className="px-4 py-3">
                     <span
                       className={`text-[11px] px-2.5 py-0.5 rounded-full font-medium tracking-wide border ${
-                        u.role === "admin"
+                        (u.role || "").toUpperCase() === "SUPERADMIN"
                           ? "bg-purple-50 text-purple-700 border-purple-200/70"
+                          : (u.role || "").toUpperCase() === "ADMIN"
+                          ? "bg-blue-50 text-blue-700 border-blue-200/70"
                           : "bg-slate-100 text-slate-600 border-slate-200/70"
                       }`}
                     >
-                      {u.role}
+                      {(u.role || "MEMBER").toUpperCase()}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-right">
                     {u.id !== currentUserId ? (
-                      <button
-                        id={`delete-user-${u.id}`}
-                        onClick={() => handleDelete(u.id, u.name)}
-                        disabled={deletingId === u.id}
-                        className="text-xs px-2.5 py-1 rounded-md text-red-600 hover:bg-red-50 border border-transparent hover:border-red-200 font-medium transition disabled:opacity-40"
-                      >
-                        {deletingId === u.id ? "Deleting..." : "Delete"}
-                      </button>
+                      <div className="flex items-center justify-end space-x-2">
+                        {(u.role || "").toUpperCase() !== "SUPERADMIN" && (
+                          <button
+                            id={`toggle-role-${u.id}`}
+                            onClick={() => handleRoleToggle(u)}
+                            className="text-xs px-2.5 py-1 rounded-md text-indigo-600 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 font-medium transition"
+                          >
+                            {(u.role || "").toUpperCase() === "ADMIN" ? "Demote to Member" : "Promote to Admin"}
+                          </button>
+                        )}
+                        <button
+                          id={`delete-user-${u.id}`}
+                          onClick={() => handleDelete(u.id, u.name)}
+                          disabled={deletingId === u.id}
+                          className="text-xs px-2.5 py-1 rounded-md text-red-600 hover:bg-red-50 border border-transparent hover:border-red-200 font-medium transition disabled:opacity-40"
+                        >
+                          {deletingId === u.id ? "Deleting..." : "Delete"}
+                        </button>
+                      </div>
                     ) : (
                       <span className="text-xs text-slate-300 px-2.5 py-1">—</span>
                     )}
@@ -273,6 +304,18 @@ export default function UserManagement({ currentUserId }) {
               ))}
             </tbody>
           </table>
+        )}
+
+        {!loading && users.length === 1 && (
+          <div className="px-4 py-3 bg-slate-50/70 border-t border-slate-100 text-xs text-slate-500 flex items-center justify-between">
+            <span>You are currently the only member in this workspace.</span>
+            <button
+              onClick={() => { setShowForm(true); setFormError(""); }}
+              className="text-purple-600 font-semibold hover:text-purple-700 transition"
+            >
+              Add a team member &rarr;
+            </button>
+          </div>
         )}
       </div>
     </div>
