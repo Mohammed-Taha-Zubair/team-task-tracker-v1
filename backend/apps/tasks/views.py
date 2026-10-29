@@ -46,6 +46,13 @@ class TeamTaskListCreateView(APIView):
     def post(self, request, id):
         team = get_team_or_error(id, request.user)
 
+        is_admin = str(getattr(request.user, "role", "") or "").lower() in ["admin", "superadmin"]
+        if not is_admin:
+            return Response(
+                {"message": "Only administrators can create tasks"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
         title = request.data.get("title", "").strip()
         description = request.data.get("description", "").strip()
         assigned_to_id = request.data.get("assigned_to")
@@ -129,6 +136,23 @@ class TaskDetailView(APIView):
 
     def patch(self, request, id):
         task, team = get_task_and_team_or_error(id, request.user)
+
+        is_admin = str(getattr(request.user, "role", "") or "").lower() in ["admin", "superadmin"]
+        if not is_admin:
+            is_assigned = (
+                task.assigned_to is not None
+                and str(task.assigned_to.id) == str(request.user.id)
+            )
+            if not is_assigned:
+                return Response(
+                    {"message": "You can only update tasks assigned to you"},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+            if "title" in request.data or "description" in request.data or "assigned_to" in request.data:
+                return Response(
+                    {"message": "Members can only update the status of tasks assigned to them"},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
 
         old_status = task.status
         status_changed = False
@@ -228,6 +252,18 @@ class TaskCommentsView(APIView):
 
     def post(self, request, id):
         task, team = get_task_and_team_or_error(id, request.user)
+
+        is_admin = str(getattr(request.user, "role", "") or "").lower() in ["admin", "superadmin"]
+        if not is_admin:
+            is_assigned = (
+                task.assigned_to is not None
+                and str(task.assigned_to.id) == str(request.user.id)
+            )
+            if not is_assigned:
+                return Response(
+                    {"message": "You can only comment on tasks assigned to you"},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
 
         text = request.data.get("text", "").strip()
         if not text:
