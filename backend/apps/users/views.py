@@ -9,21 +9,14 @@ from apps.users.authentication import generate_access_token, generate_refresh_to
 
 
 # POST /api/auth/register/
-# Bootstrap endpoint: only works when there are zero users in the DB.
-# Once an admin exists, this returns 403. All future user creation goes through
-# the admin-only POST /api/users/ endpoint below.
+# Public registration: anyone can register. Every newly registered account
+# strictly receives the "member" role. Admin privileges cannot be obtained
+# through public registration.
 class RegisterView(APIView):
     authentication_classes = []
     permission_classes = []
 
     def post(self, request):
-        # Allow registration only if no users exist yet (first admin bootstrap)
-        if User.objects.count() > 0:
-            return Response(
-                {"message": "Registration is disabled. Contact your administrator to get access."},
-                status=status.HTTP_403_FORBIDDEN,
-            )
-
         name = request.data.get("name", "").strip()
         email = request.data.get("email", "").strip().lower()
         password = request.data.get("password", "")
@@ -34,24 +27,30 @@ class RegisterView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        if len(password) < 8:
+            return Response(
+                {"message": "Password must be at least 8 characters"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         if User.objects(email=email).first():
             return Response(
                 {"message": "Email is already registered"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # First user is always admin
+        # Public registration always assigns member role (ignores any client-supplied role)
         user = User(
             name=name,
             email=email,
             password=make_password(password),
-            role="admin",
+            role="member",
         )
         user.save()
 
         return Response(
             {
-                "message": "Admin account created successfully",
+                "message": "Account created successfully",
                 "user": user.to_dict(),
             },
             status=status.HTTP_201_CREATED,
