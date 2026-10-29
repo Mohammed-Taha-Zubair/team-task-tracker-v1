@@ -161,11 +161,13 @@ function TeamViewContent() {
                 loading={loadingTasks}
               />
 
-              <NewTaskForm
-                teamId={teamId}
-                members={team?.members || []}
-                onTaskCreated={handleTaskCreated}
-              />
+              {user?.role === "admin" && (
+                <NewTaskForm
+                  teamId={teamId}
+                  members={team?.members || []}
+                  onTaskCreated={handleTaskCreated}
+                />
+              )}
             </div>
 
             <div className="lg:col-span-1 sticky top-20">

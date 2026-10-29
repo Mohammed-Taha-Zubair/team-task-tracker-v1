@@ -300,3 +300,11 @@ class TaskCommentsView(APIView):
             },
             status=status.HTTP_201_CREATED,
         )
+
+
+# GET /api/tasks/my/: List all tasks assigned to the authenticated user
+class UserAssignedTasksView(APIView):
+    def get(self, request):
+        tasks = Task.objects(assigned_to=request.user).order_by("-updated_at")
+        return Response([format_task(t) for t in tasks], status=status.HTTP_200_OK)
+
