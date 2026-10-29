@@ -99,8 +99,25 @@ function TeamViewContent() {
   }, [teamId, currentFilter]);
 
   const handleFilterChange = (filterKey) => {
-    setCurrentFilter(filterKey);
+    if (filterKey === currentFilter) {
+      // Re-fetch current filter smoothly without hanging
+      setLoadingTasks(true);
+      const query = filterKey !== "all" ? `?status=${filterKey}` : "";
+      api
+        .get(`/api/teams/${teamId}/tasks/${query}`)
+        .then((data) => {
+          setTasks(data || []);
+        })
+        .catch((err) => {
+          console.error("Failed to load tasks:", err);
+        })
+        .finally(() => {
+          setLoadingTasks(false);
+        });
+      return;
+    }
     setLoadingTasks(true);
+    setCurrentFilter(filterKey);
   };
 
   const handleTaskCreated = () => {
