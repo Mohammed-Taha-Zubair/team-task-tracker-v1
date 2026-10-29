@@ -19,6 +19,9 @@ export default function DashboardPage() {
   const [myTasks, setMyTasks] = useState([]);
   const [loadingTasks, setLoadingTasks] = useState(true);
 
+  const isAdmin = user?.role === "admin";
+  const isMember = user?.role === "member";
+
   const fetchTeams = useCallback(async () => {
     try {
       const data = await api.get("/api/teams/");
@@ -32,6 +35,10 @@ export default function DashboardPage() {
   }, []);
 
   const fetchMyTasks = useCallback(async () => {
+    if (!isMember) {
+      setLoadingTasks(false);
+      return;
+    }
     try {
       const data = await api.get("/api/tasks/my/");
       setMyTasks(data || []);
@@ -40,10 +47,11 @@ export default function DashboardPage() {
     } finally {
       setLoadingTasks(false);
     }
-  }, []);
+  }, [isMember]);
 
   useEffect(() => {
     let active = true;
+
     api
       .get("/api/teams/")
       .then((data) => {
@@ -60,25 +68,27 @@ export default function DashboardPage() {
         }
       });
 
-    api
-      .get("/api/tasks/my/")
-      .then((data) => {
-        if (active) {
-          setMyTasks(data || []);
-          setLoadingTasks(false);
-        }
-      })
-      .catch((err) => {
-        if (active) {
-          console.error("Failed to load assigned tasks:", err);
-          setLoadingTasks(false);
-        }
-      });
+    if (isMember) {
+      api
+        .get("/api/tasks/my/")
+        .then((data) => {
+          if (active) {
+            setMyTasks(data || []);
+            setLoadingTasks(false);
+          }
+        })
+        .catch((err) => {
+          if (active) {
+            console.error("Failed to load assigned tasks:", err);
+            setLoadingTasks(false);
+          }
+        });
+    }
 
     return () => {
       active = false;
     };
-  }, []);
+  }, [isMember]);
 
   const getStatusBadge = (s) => {
     switch (s) {
@@ -93,15 +103,15 @@ export default function DashboardPage() {
 
   return (
     <ProtectedPage>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
         {/* Welcome Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-6 mb-8 border-b border-slate-200/80 gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-6 border-b border-slate-200/80 gap-4">
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-slate-900">
               Welcome, {user?.name}!
             </h1>
             <p className="text-sm text-slate-500 mt-1">
-              {user?.role === "admin"
+              {isAdmin
                 ? "Manage teams, assign tasks, and monitor workspace activity."
                 : "Collaborate with your team, track assigned tasks, and update your progress."}
             </p>
@@ -109,7 +119,7 @@ export default function DashboardPage() {
           <div className="flex items-center space-x-2">
             <span
               className={`text-xs px-3 py-1 rounded-full font-semibold uppercase tracking-wider border ${
-                user?.role === "admin"
+                isAdmin
                   ? "bg-purple-50 text-purple-700 border-purple-200/70"
                   : "bg-slate-100 text-slate-700 border-slate-200/70"
               }`}
@@ -119,19 +129,14 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Admin Only: Create Team Form */}
-        {user?.role === "admin" && (
+        {/* ADMIN VIEW: Create Team Form */}
+        {isAdmin && (
           <CreateTeamForm onTeamCreated={fetchTeams} />
         )}
 
-        {/* Admin Only: User Management */}
-        {user?.role === "admin" && (
-          <UserManagement currentUserId={user?.id} />
-        )}
-
-        {/* Member View: My Assigned Tasks */}
-        {user?.role === "member" && (
-          <div className="mb-10">
+        {/* MEMBER VIEW: My Assigned Tasks */}
+        {isMember && (
+          <div>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-base font-bold text-slate-900 flex items-center space-x-2">
                 <span className="w-6 h-6 rounded-md bg-indigo-100 text-indigo-700 flex items-center justify-center">
@@ -193,7 +198,7 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* Teams List */}
+        {/* SHARED VIEW: Teams Workspace List */}
         <div>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-base font-bold text-slate-900">Your Teams</h2>
@@ -228,7 +233,7 @@ export default function DashboardPage() {
                 No teams found
               </h3>
               <p className="mt-1 text-xs text-slate-500 max-w-sm mx-auto">
-                {user?.role === "admin"
+                {isAdmin
                   ? "You haven't created any teams yet. Use the form above to create your first team!"
                   : "You are not a member of any teams yet. Ask your team admin to invite your email address."}
               </p>
@@ -241,6 +246,11 @@ export default function DashboardPage() {
             </div>
           )}
         </div>
+
+        {/* ADMIN VIEW: Member Management Directory */}
+        {isAdmin && (
+          <UserManagement currentUserId={user?.id} />
+        )}
       </div>
     </ProtectedPage>
   );
