@@ -21,46 +21,72 @@ function TaskDetailContent() {
   const [comments, setComments] = useState([]);
   const [loadingComments, setLoadingComments] = useState(true);
 
-  const fetchTask = useCallback(async () => {
-    if (!taskId) return;
-    try {
-      const data = await api.get(`/api/tasks/${taskId}/`);
-      setTask(data);
-      setPageError("");
-    } catch (err) {
-      setPageError(err?.message || "Failed to load task details");
-    } finally {
-      setLoading(false);
-    }
-  }, [taskId]);
-
-  const fetchTeamMembers = useCallback(async () => {
-    if (!teamId) return;
-    try {
-      const teamData = await api.get(`/api/teams/${teamId}/`);
-      setMembers(teamData.members || []);
-    } catch (err) {
-      console.error("Failed to load team members:", err);
-    }
-  }, [teamId]);
-
-  const fetchComments = useCallback(async () => {
+  const refreshComments = useCallback(async () => {
     if (!taskId) return;
     try {
       const commentsData = await api.get(`/api/tasks/${taskId}/comments/`);
       setComments(commentsData || []);
     } catch (err) {
       console.error("Failed to load comments:", err);
-    } finally {
-      setLoadingComments(false);
     }
   }, [taskId]);
 
   useEffect(() => {
-    fetchTask();
-    fetchTeamMembers();
-    fetchComments();
-  }, [fetchTask, fetchTeamMembers, fetchComments]);
+    let ignore = false;
+    if (!taskId) return;
+
+    api
+      .get(`/api/tasks/${taskId}/`)
+      .then((data) => {
+        if (!ignore) {
+          setTask(data);
+          setPageError("");
+          setLoading(false);
+        }
+      })
+      .catch((err) => {
+        if (!ignore) {
+          setPageError(err?.message || "Failed to load task details");
+          setLoading(false);
+        }
+      });
+
+    if (teamId) {
+      api
+        .get(`/api/teams/${teamId}/`)
+        .then((teamData) => {
+          if (!ignore) {
+            setMembers(teamData.members || []);
+          }
+        })
+        .catch((err) => {
+          if (!ignore) {
+            console.error("Failed to load team members:", err);
+          }
+        });
+    }
+
+    api
+      .get(`/api/tasks/${taskId}/comments/`)
+      .then((commentsData) => {
+        if (!ignore) {
+          setComments(commentsData || []);
+          setLoadingComments(false);
+        }
+      })
+      .catch((err) => {
+        if (!ignore) {
+          console.error("Failed to load comments:", err);
+          setLoadingComments(false);
+        }
+      });
+
+    return () => {
+      ignore = true;
+    };
+  }, [taskId, teamId]);
+
+  const actualTeamId = teamId || task?.team_id;
 
   return (
     <ProtectedPage>
@@ -68,7 +94,7 @@ function TaskDetailContent() {
         {/* Navigation / Back to Team */}
         <div className="mb-6">
           <Link
-            href={`/teams/${teamId}`}
+            href={`/teams/${actualTeamId}`}
             className="inline-flex items-center text-xs font-semibold text-slate-500 hover:text-indigo-600 transition"
           >
             <span aria-hidden="true" className="mr-1.5 font-bold">
@@ -83,7 +109,7 @@ function TaskDetailContent() {
             <h2 className="text-base font-bold">Unable to load task</h2>
             <p className="text-sm mt-1">{pageError}</p>
             <Link
-              href={`/teams/${teamId}`}
+              href={`/teams/${actualTeamId}`}
               className="mt-4 inline-block px-4 py-2 bg-red-600 text-white rounded-lg text-xs font-semibold hover:bg-red-700 transition"
             >
               Back to Team Workspace
@@ -96,6 +122,7 @@ function TaskDetailContent() {
         ) : (
           <div className="space-y-6">
             <TaskEditForm
+              key={task?.id}
               task={task}
               members={members}
               onTaskSaved={(updatedTask) => setTask(updatedTask)}
@@ -105,7 +132,7 @@ function TaskDetailContent() {
               taskId={taskId}
               comments={comments}
               loading={loadingComments}
-              onCommentAdded={fetchComments}
+              onCommentAdded={refreshComments}
             />
           </div>
         )}

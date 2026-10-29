@@ -24,7 +24,7 @@ function TeamViewContent() {
   const [teamError, setTeamError] = useState("");
   const [timelineRefreshTrigger, setTimelineRefreshTrigger] = useState(0);
 
-  const fetchTeam = useCallback(async () => {
+  const refreshTeam = useCallback(async () => {
     if (!teamId) return;
     try {
       const data = await api.get(`/api/teams/${teamId}/`);
@@ -32,12 +32,10 @@ function TeamViewContent() {
       setTeamError("");
     } catch (err) {
       setTeamError(err?.message || "Failed to load team details");
-    } finally {
-      setLoadingTeam(false);
     }
   }, [teamId]);
 
-  const fetchTasks = useCallback(async (filter = currentFilter) => {
+  const refreshTasks = useCallback(async (filter = currentFilter) => {
     if (!teamId) return;
     try {
       const query = filter && filter !== "all" ? `?status=${filter}` : "";
@@ -45,15 +43,60 @@ function TeamViewContent() {
       setTasks(data || []);
     } catch (err) {
       console.error("Failed to load tasks:", err);
-    } finally {
-      setLoadingTasks(false);
     }
   }, [teamId, currentFilter]);
 
+  // Load team details on mount / teamId change
   useEffect(() => {
-    fetchTeam();
-    fetchTasks(currentFilter);
-  }, [fetchTeam, fetchTasks, currentFilter]);
+    let ignore = false;
+    if (!teamId) return;
+
+    api
+      .get(`/api/teams/${teamId}/`)
+      .then((data) => {
+        if (!ignore) {
+          setTeam(data);
+          setTeamError("");
+          setLoadingTeam(false);
+        }
+      })
+      .catch((err) => {
+        if (!ignore) {
+          setTeamError(err?.message || "Failed to load team details");
+          setLoadingTeam(false);
+        }
+      });
+
+    return () => {
+      ignore = true;
+    };
+  }, [teamId]);
+
+  // Load tasks on mount / teamId change / filter change
+  useEffect(() => {
+    let ignore = false;
+    if (!teamId) return;
+
+    const query = currentFilter && currentFilter !== "all" ? `?status=${currentFilter}` : "";
+    api
+      .get(`/api/teams/${teamId}/tasks/${query}`)
+      .then((data) => {
+        if (!ignore) {
+          setTasks(data || []);
+          setLoadingTasks(false);
+        }
+      })
+      .catch((err) => {
+        if (!ignore) {
+          console.error("Failed to load tasks:", err);
+          setLoadingTasks(false);
+        }
+      });
+
+    return () => {
+      ignore = true;
+    };
+  }, [teamId, currentFilter]);
 
   const handleFilterChange = (filterKey) => {
     setCurrentFilter(filterKey);
@@ -61,12 +104,12 @@ function TeamViewContent() {
   };
 
   const handleTaskCreated = () => {
-    fetchTasks(currentFilter);
+    refreshTasks(currentFilter);
     setTimelineRefreshTrigger((prev) => prev + 1);
   };
 
   const handleTeamUpdated = async () => {
-    await fetchTeam();
+    await refreshTeam();
     setTimelineRefreshTrigger((prev) => prev + 1);
   };
 

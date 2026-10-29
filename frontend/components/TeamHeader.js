@@ -15,6 +15,8 @@ export default function TeamHeader({ team, user, onTeamUpdated }) {
       return;
     }
 
+    if (!team?.id) return;
+
     setInviting(true);
     setInviteMessage(null);
 
@@ -64,7 +66,7 @@ export default function TeamHeader({ team, user, onTeamUpdated }) {
           Team Members
         </h3>
         <div className="flex flex-wrap gap-2">
-          {team?.members?.map((member) => (
+          {team?.members?.filter(Boolean).map((member) => (
             <div
               key={member.id}
               className="inline-flex items-center space-x-2 bg-slate-50 border border-slate-200/80 px-2.5 py-1.5 rounded-lg text-xs"

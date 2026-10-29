@@ -10,7 +10,7 @@ from apps.activity.services import log_activity
 # GET /api/teams/: List all teams where the authenticated user is a member
 class TeamListCreateView(APIView):
     def post(self, request):
-        if getattr(request.user, "role", None) != "admin":
+        if str(getattr(request.user, "role", "") or "").lower() not in ["admin", "superadmin"]:
             return Response(
                 {"message": "Admin access required"},
                 status=status.HTTP_403_FORBIDDEN,
@@ -72,7 +72,7 @@ class TeamInviteView(APIView):
     def post(self, request, id):
         team = get_team_or_error(id, request.user)
 
-        if getattr(request.user, "role", None) != "admin":
+        if str(getattr(request.user, "role", "") or "").lower() not in ["admin", "superadmin"]:
             return Response(
                 {"message": "Admin access required"},
                 status=status.HTTP_403_FORBIDDEN,

@@ -6,6 +6,13 @@ import { api, setAccessToken } from "@/lib/api";
 
 const AuthContext = createContext();
 
+const normalizeUser = (userData) => {
+  if (!userData) return null;
+  const roleStr = String(userData.role || "member").toLowerCase();
+  const role = roleStr.includes("admin") ? "admin" : "member";
+  return { ...userData, role };
+};
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -27,7 +34,7 @@ export const AuthProvider = ({ children }) => {
 
           // 3. Fetch user profile
           const meData = await api.get("/api/auth/me/");
-          setUser(meData.user);
+          setUser(normalizeUser(meData.user));
         }
       } catch (err) {
         // If refresh fails, clear token and user state
@@ -47,7 +54,7 @@ export const AuthProvider = ({ children }) => {
     const data = await api.post("/api/auth/login/", { email, password });
     localStorage.setItem("refreshToken", data.refreshToken);
     setAccessToken(data.accessToken);
-    setUser(data.user);
+    setUser(normalizeUser(data.user));
     return data;
   };
 

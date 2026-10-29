@@ -5,8 +5,9 @@ class IsAdmin(BasePermission):
     message = "Admin access required"
 
     def has_permission(self, request, view):
+        role = str(getattr(request.user, "role", "") or "").lower()
         return bool(
             request.user
             and getattr(request.user, "is_authenticated", False)
-            and getattr(request.user, "role", None) == "admin"
+            and role in ["admin", "superadmin"]
         )
