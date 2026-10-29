@@ -15,14 +15,14 @@ class CreateAdminCommandTest(TestCase):
         out = io.StringIO()
         call_command(
             "create_admin",
-            name="Super Admin",
+            name="Initial Admin",
             email="admin@example.com",
             password="AdminPassword123!",
             stdout=out
         )
         user = User.objects(email="admin@example.com").first()
         self.assertIsNotNone(user)
-        self.assertEqual(user.name, "Super Admin")
+        self.assertEqual(user.name, "Initial Admin")
         self.assertEqual(user.role, "admin")
         self.assertTrue(check_password("AdminPassword123!", user.password))
         self.assertIn("Admin account created successfully", out.getvalue())

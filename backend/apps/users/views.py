@@ -227,8 +227,8 @@ class UserRoleUpdateView(APIView):
         current_role = (user.role or "member").lower()
 
         # If demoting from admin to member, check that this is not the last remaining admin
-        if current_role in ["admin", "superadmin"] and new_role == "member":
-            admin_count = User.objects(role__in=["admin", "ADMIN", "superadmin", "SUPERADMIN"]).count()
+        if current_role == "admin" and new_role == "member":
+            admin_count = User.objects(role__in=["admin", "ADMIN"]).count()
             if admin_count <= 1:
                 return Response(
                     {"message": "Cannot demote the last remaining administrator."},
@@ -267,8 +267,8 @@ class UserDetailView(APIView):
             )
 
         # Protect the last remaining admin from deletion
-        if (user.role or "").lower() in ["admin", "superadmin"]:
-            admin_count = User.objects(role__in=["admin", "ADMIN", "superadmin", "SUPERADMIN"]).count()
+        if (user.role or "").lower() == "admin":
+            admin_count = User.objects(role__in=["admin", "ADMIN"]).count()
             if admin_count <= 1:
                 return Response(
                     {"message": "Cannot delete the last remaining administrator."},
@@ -298,8 +298,8 @@ class UserDetailView(APIView):
                     {"message": "Role must be 'admin' or 'member'"},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-            if (user.role or "").lower() in ["admin", "superadmin"] and role == "member":
-                admin_count = User.objects(role__in=["admin", "ADMIN", "superadmin", "SUPERADMIN"]).count()
+            if (user.role or "").lower() == "admin" and role == "member":
+                admin_count = User.objects(role__in=["admin", "ADMIN"]).count()
                 if admin_count <= 1:
                     return Response(
                         {"message": "Cannot demote the last remaining administrator."},

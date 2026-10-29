@@ -9,7 +9,7 @@ const AuthContext = createContext();
 const normalizeUser = (userData) => {
   if (!userData) return null;
   const roleStr = String(userData.role || "member").toLowerCase();
-  const role = roleStr.includes("admin") ? "admin" : "member";
+  const role = roleStr === "admin" ? "admin" : "member";
   return { ...userData, role };
 };
 

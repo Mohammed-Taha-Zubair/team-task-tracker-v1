@@ -46,7 +46,7 @@ class TeamTaskListCreateView(APIView):
     def post(self, request, id):
         team = get_team_or_error(id, request.user)
 
-        is_admin = str(getattr(request.user, "role", "") or "").lower() in ["admin", "superadmin"]
+        is_admin = str(getattr(request.user, "role", "") or "").lower() == "admin"
         if not is_admin:
             return Response(
                 {"message": "Only administrators can create tasks"},
@@ -137,7 +137,7 @@ class TaskDetailView(APIView):
     def patch(self, request, id):
         task, team = get_task_and_team_or_error(id, request.user)
 
-        is_admin = str(getattr(request.user, "role", "") or "").lower() in ["admin", "superadmin"]
+        is_admin = str(getattr(request.user, "role", "") or "").lower() == "admin"
         if not is_admin:
             is_assigned = (
                 task.assigned_to is not None
@@ -253,7 +253,7 @@ class TaskCommentsView(APIView):
     def post(self, request, id):
         task, team = get_task_and_team_or_error(id, request.user)
 
-        is_admin = str(getattr(request.user, "role", "") or "").lower() in ["admin", "superadmin"]
+        is_admin = str(getattr(request.user, "role", "") or "").lower() == "admin"
         if not is_admin:
             is_assigned = (
                 task.assigned_to is not None
