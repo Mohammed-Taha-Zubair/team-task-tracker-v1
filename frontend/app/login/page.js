@@ -28,9 +28,14 @@ export default function LoginPage() {
 
     try {
       await login(email, password);
+      // Clean input fields upon successful authentication
+      setEmail("");
+      setPassword("");
       router.push("/dashboard");
     } catch (err) {
       setError(err?.message || "Invalid email or password");
+      // Clear password field on failed attempt for security and hygiene
+      setPassword("");
     } finally {
       setSubmitting(false);
     }
@@ -52,11 +57,20 @@ export default function LoginPage() {
         </div>
 
         {error && (
-          <div className="mb-5 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-xs font-medium flex items-center space-x-2">
-            <svg className="w-4 h-4 text-red-500 shrink-0" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-            </svg>
-            <span>{error}</span>
+          <div className="mb-5 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-xs font-medium flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <svg className="w-4 h-4 text-red-500 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+              <span>{error}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setError("")}
+              className="text-red-500 hover:text-red-700 text-xs font-bold ml-2 cursor-pointer"
+            >
+              &times;
+            </button>
           </div>
         )}
 
@@ -66,8 +80,10 @@ export default function LoginPage() {
               Email Address
             </label>
             <input
+              id="login-email"
               type="email"
               required
+              autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
@@ -80,8 +96,10 @@ export default function LoginPage() {
               Password
             </label>
             <input
+              id="login-password"
               type="password"
               required
+              autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"

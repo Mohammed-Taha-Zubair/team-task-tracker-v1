@@ -30,6 +30,8 @@ export default function RegisterPage() {
 
     if (password !== confirmPassword) {
       setError("Passwords do not match");
+      setPassword("");
+      setConfirmPassword("");
       return;
     }
     if (password.length < 8) {
@@ -43,9 +45,16 @@ export default function RegisterPage() {
       await api.post("/api/auth/register/", { name, email, password });
       // Automatically log in the newly registered member
       await login(email, password);
+      // Clean state
+      setName("");
+      setEmail("");
+      setPassword("");
+      setConfirmPassword("");
       router.push("/dashboard");
     } catch (err) {
       setError(err?.message || "Registration failed. Please try again.");
+      setPassword("");
+      setConfirmPassword("");
     } finally {
       setSubmitting(false);
     }
@@ -67,11 +76,20 @@ export default function RegisterPage() {
         </div>
 
         {error && (
-          <div className="mb-5 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-xs font-medium flex items-center space-x-2">
-            <svg className="w-4 h-4 text-red-500 shrink-0" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-            </svg>
-            <span>{error}</span>
+          <div className="mb-5 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-xs font-medium flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <svg className="w-4 h-4 text-red-500 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+              <span>{error}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setError("")}
+              className="text-red-500 hover:text-red-700 text-xs font-bold ml-2 cursor-pointer"
+            >
+              &times;
+            </button>
           </div>
         )}
 
@@ -81,8 +99,10 @@ export default function RegisterPage() {
               Full Name
             </label>
             <input
+              id="register-name"
               type="text"
               required
+              autoComplete="name"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Alice Johnson"
@@ -95,8 +115,10 @@ export default function RegisterPage() {
               Email Address
             </label>
             <input
+              id="register-email"
               type="email"
               required
+              autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="alice@company.com"
@@ -106,14 +128,16 @@ export default function RegisterPage() {
 
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-              Password <span className="font-normal text-slate-400">(min. 8 characters)</span>
+              Password
             </label>
             <input
+              id="register-password"
               type="password"
               required
+              autoComplete="new-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
+              placeholder="At least 8 characters"
               className="w-full px-3.5 py-2.5 bg-white text-slate-900 border border-slate-300 rounded-lg text-sm shadow-2xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition placeholder:text-slate-400"
             />
           </div>
@@ -123,11 +147,13 @@ export default function RegisterPage() {
               Confirm Password
             </label>
             <input
+              id="register-confirm-password"
               type="password"
               required
+              autoComplete="new-password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="••••••••"
+              placeholder="Re-enter your password"
               className="w-full px-3.5 py-2.5 bg-white text-slate-900 border border-slate-300 rounded-lg text-sm shadow-2xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition placeholder:text-slate-400"
             />
           </div>

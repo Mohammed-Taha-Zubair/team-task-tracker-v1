@@ -108,7 +108,13 @@ export default function UserManagement({ currentUserId }) {
         <div className="flex items-center space-x-2">
           <button
             id="add-user-btn"
-            onClick={() => { setShowForm(!showForm); setFormError(""); }}
+            onClick={() => {
+              if (showForm) {
+                setForm({ name: "", email: "", password: "" });
+              }
+              setShowForm(!showForm);
+              setFormError("");
+            }}
             className="flex items-center space-x-1.5 text-xs px-3.5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium shadow-xs transition cursor-pointer"
           >
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -269,7 +275,7 @@ export default function UserManagement({ currentUserId }) {
                         <div className="flex items-center space-x-2.5">
                           <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold shrink-0 ${isAdmin ? "bg-purple-100 text-purple-700" : "bg-indigo-100 text-indigo-700"
                             }`}>
-                            {u.name?.charAt(0)?.toUpperCase() || "U"}
+                            {u.name?.charAt(0)?.toUpperCase() || "User"}
                           </div>
                           <span className="font-medium text-slate-800 text-xs">
                             {u.name}
@@ -283,8 +289,8 @@ export default function UserManagement({ currentUserId }) {
                       <td className="px-4 py-3">
                         <span
                           className={`text-[11px] px-2.5 py-0.5 rounded-full font-semibold uppercase tracking-wider border ${isAdmin
-                              ? "bg-purple-50 text-purple-700 border-purple-200/70"
-                              : "bg-slate-100 text-slate-600 border-slate-200/70"
+                            ? "bg-purple-50 text-purple-700 border-purple-200/70"
+                            : "bg-slate-100 text-slate-600 border-slate-200/70"
                             }`}
                         >
                           {u.role}

@@ -144,6 +144,10 @@ export default function NewTaskForm({ teamId, members = [], onTaskCreated }) {
               onClick={() => {
                 setIsExpanded(false);
                 setError("");
+                setTitle("");
+                setDescription("");
+                setAssignedTo("");
+                setStatus("pending");
               }}
               disabled={submitting}
               className="px-3.5 py-2 text-xs font-medium text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition cursor-pointer"
