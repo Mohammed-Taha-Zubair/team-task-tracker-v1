@@ -1,5 +1,5 @@
 from django.urls import path, include
-from apps.users.views import UserListCreateView, UserDetailView
+from apps.users.views import UserListCreateView, UserDetailView, UserRoleUpdateView
 
 # Top-level URL routing for the project: includes each app's urls.py
 urlpatterns = [
@@ -10,4 +10,5 @@ urlpatterns = [
     # Admin-only user management
     path("api/users/", UserListCreateView.as_view(), name="user-list-create"),
     path("api/users/<str:user_id>/", UserDetailView.as_view(), name="user-detail"),
+    path("api/users/<str:user_id>/role/", UserRoleUpdateView.as_view(), name="user-role-update"),
 ]

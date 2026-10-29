@@ -4,6 +4,7 @@ from django.contrib.auth.hashers import make_password, check_password
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from mongoengine.queryset.visitor import Q
 from apps.users.models import User
 from apps.users.authentication import generate_access_token, generate_refresh_token
 
@@ -151,14 +152,20 @@ class MeView(APIView):
 from apps.common.permissions import IsAdmin
 
 
-# GET  /api/users/       — list all users (admin only)
-# POST /api/users/       — create a new user (admin only, members only)
+# GET  /api/users/?search=<query> — list all users with optional search (admin only)
+# POST /api/users/               — create a new user (admin only)
 class UserListCreateView(APIView):
     permission_classes = [IsAdmin]
 
     def get(self, request):
-        users = [u.to_dict() for u in User.objects.all()]
-        return Response({"users": users}, status=status.HTTP_200_OK)
+        search_query = request.query_params.get("search", "").strip()
+        if search_query:
+            users = User.objects(
+                Q(name__icontains=search_query) | Q(email__icontains=search_query)
+            ).order_by("-created_at")
+        else:
+            users = User.objects.all().order_by("-created_at")
+        return Response({"users": [u.to_dict() for u in users]}, status=status.HTTP_200_OK)
 
     def post(self, request):
         name = request.data.get("name", "").strip()
@@ -172,16 +179,9 @@ class UserListCreateView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Enforce single super admin policy: all created users must be members
-        if role == "admin":
+        if role not in ["admin", "member"]:
             return Response(
-                {"message": "Only one super admin is allowed. New users must be created as members."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        if role != "member":
-            return Response(
-                {"message": "Role must be 'member'"},
+                {"message": "Role must be 'admin' or 'member'"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -195,7 +195,7 @@ class UserListCreateView(APIView):
             name=name,
             email=email,
             password=make_password(password),
-            role="member",
+            role=role,
         )
         user.save()
 
@@ -205,7 +205,50 @@ class UserListCreateView(APIView):
         )
 
 
-# DELETE /api/users/<user_id>/  — delete a user (admin only, cannot delete self)
+# PATCH /api/users/<user_id>/role/ — promote or demote user role (admin only)
+class UserRoleUpdateView(APIView):
+    permission_classes = [IsAdmin]
+
+    def patch(self, request, user_id):
+        user = User.objects(id=user_id).first()
+        if not user:
+            return Response(
+                {"message": "User not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        new_role = request.data.get("role", "").strip().lower()
+        if new_role not in ["admin", "member"]:
+            return Response(
+                {"message": "Role must be 'admin' or 'member'"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        current_role = (user.role or "member").lower()
+
+        # If demoting from admin to member, check that this is not the last remaining admin
+        if current_role in ["admin", "superadmin"] and new_role == "member":
+            admin_count = User.objects(role__in=["admin", "ADMIN", "superadmin", "SUPERADMIN"]).count()
+            if admin_count <= 1:
+                return Response(
+                    {"message": "Cannot demote the last remaining administrator."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        user.role = new_role
+        user.save()
+
+        action = "promoted to Admin" if new_role == "admin" else "demoted to Member"
+        return Response(
+            {
+                "message": f"User {user.name} {action} successfully",
+                "user": user.to_dict(),
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+# DELETE /api/users/<user_id>/  — delete a user (admin only, cannot delete self or last admin)
 class UserDetailView(APIView):
     permission_classes = [IsAdmin]
 
@@ -222,6 +265,15 @@ class UserDetailView(APIView):
                 {"message": "User not found"},
                 status=status.HTTP_404_NOT_FOUND,
             )
+
+        # Protect the last remaining admin from deletion
+        if (user.role or "").lower() in ["admin", "superadmin"]:
+            admin_count = User.objects(role__in=["admin", "ADMIN", "superadmin", "SUPERADMIN"]).count()
+            if admin_count <= 1:
+                return Response(
+                    {"message": "Cannot delete the last remaining administrator."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
         user.delete()
         return Response({"message": "User deleted successfully"}, status=status.HTTP_200_OK)
@@ -240,11 +292,20 @@ class UserDetailView(APIView):
         password = request.data.get("password", "")
         role = request.data.get("role", "").strip().lower()
 
-        if role == "admin" and str(user.id) != str(request.user.id):
-            return Response(
-                {"message": "Only one super admin is allowed in the system."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        if role:
+            if role not in ["admin", "member"]:
+                return Response(
+                    {"message": "Role must be 'admin' or 'member'"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if (user.role or "").lower() in ["admin", "superadmin"] and role == "member":
+                admin_count = User.objects(role__in=["admin", "ADMIN", "superadmin", "SUPERADMIN"]).count()
+                if admin_count <= 1:
+                    return Response(
+                        {"message": "Cannot demote the last remaining administrator."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+            user.role = role
 
         if name:
             user.name = name
