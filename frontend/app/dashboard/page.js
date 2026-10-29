@@ -130,66 +130,68 @@ export default function DashboardPage() {
         )}
 
         {/* Member View: My Assigned Tasks */}
-        <div className="mb-10">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-base font-bold text-slate-900 flex items-center space-x-2">
-              <span className="w-6 h-6 rounded-md bg-indigo-100 text-indigo-700 flex items-center justify-center">
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-                </svg>
+        {user?.role === "member" && (
+          <div className="mb-10">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-base font-bold text-slate-900 flex items-center space-x-2">
+                <span className="w-6 h-6 rounded-md bg-indigo-100 text-indigo-700 flex items-center justify-center">
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                  </svg>
+                </span>
+                <span>My Assigned Tasks</span>
+              </h2>
+              <span className="text-xs text-slate-500 font-medium">
+                {myTasks.length} {myTasks.length === 1 ? "task" : "tasks"}
               </span>
-              <span>My Assigned Tasks</span>
-            </h2>
-            <span className="text-xs text-slate-500 font-medium">
-              {myTasks.length} {myTasks.length === 1 ? "task" : "tasks"}
-            </span>
-          </div>
+            </div>
 
-          {loadingTasks ? (
-            <div className="py-8 text-center text-slate-400 font-medium text-xs">
-              Loading your tasks...
-            </div>
-          ) : myTasks.length === 0 ? (
-            <div className="p-6 text-center bg-white rounded-xl border border-dashed border-slate-200 text-slate-500 text-xs">
-              No tasks currently assigned to you.
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {myTasks.map((t) => (
-                <Link
-                  key={t.id}
-                  href={`/teams/${t.team_id}/tasks/${t.id}`}
-                  className="block bg-white border border-slate-200/90 rounded-xl p-4 hover:border-indigo-300 hover:shadow-xs transition group"
-                >
-                  <div className="flex items-center justify-between gap-2 mb-2">
-                    <span className="text-[11px] font-mono text-slate-400">
-                      #{t.id.slice(-6)}
-                    </span>
-                    <span
-                      className={`text-[10px] px-2 py-0.5 rounded-full font-semibold uppercase tracking-wider border ${getStatusBadge(
-                        t.status
-                      )}`}
-                    >
-                      {t.status.replace("_", " ")}
-                    </span>
-                  </div>
-                  <h3 className="text-sm font-semibold text-slate-900 group-hover:text-indigo-600 transition line-clamp-1">
-                    {t.title}
-                  </h3>
-                  {t.description && (
-                    <p className="text-xs text-slate-500 mt-1 line-clamp-2">
-                      {t.description}
-                    </p>
-                  )}
-                  <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
-                    <span>Updated {formatRelativeTime(t.updated_at)}</span>
-                    <span className="font-semibold text-indigo-600 group-hover:underline">View &rarr;</span>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          )}
-        </div>
+            {loadingTasks ? (
+              <div className="py-8 text-center text-slate-400 font-medium text-xs">
+                Loading your tasks...
+              </div>
+            ) : myTasks.length === 0 ? (
+              <div className="p-6 text-center bg-white rounded-xl border border-dashed border-slate-200 text-slate-500 text-xs">
+                No tasks currently assigned to you.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {myTasks.map((t) => (
+                  <Link
+                    key={t.id}
+                    href={`/teams/${t.team_id}/tasks/${t.id}`}
+                    className="block bg-white border border-slate-200/90 rounded-xl p-4 hover:border-indigo-300 hover:shadow-xs transition group"
+                  >
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <span className="text-[11px] font-mono text-slate-400">
+                        #{t.id.slice(-6)}
+                      </span>
+                      <span
+                        className={`text-[10px] px-2 py-0.5 rounded-full font-semibold uppercase tracking-wider border ${getStatusBadge(
+                          t.status
+                        )}`}
+                      >
+                        {t.status.replace("_", " ")}
+                      </span>
+                    </div>
+                    <h3 className="text-sm font-semibold text-slate-900 group-hover:text-indigo-600 transition line-clamp-1">
+                      {t.title}
+                    </h3>
+                    {t.description && (
+                      <p className="text-xs text-slate-500 mt-1 line-clamp-2">
+                        {t.description}
+                      </p>
+                    )}
+                    <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
+                      <span>Updated {formatRelativeTime(t.updated_at)}</span>
+                      <span className="font-semibold text-indigo-600 group-hover:underline">View &rarr;</span>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Teams List */}
         <div>

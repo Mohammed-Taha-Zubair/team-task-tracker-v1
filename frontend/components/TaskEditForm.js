@@ -213,9 +213,9 @@ export default function TaskEditForm({ task, members = [], onTaskSaved }) {
               className="w-full px-3.5 py-2.5 bg-white text-slate-900 border border-slate-300 rounded-lg text-sm shadow-2xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition disabled:bg-slate-50 disabled:text-slate-600 disabled:cursor-not-allowed"
             >
               <option value="">Unassigned</option>
-              {members?.filter(Boolean).map((member) => (
+              {members?.filter((m) => m && m.role === "member").map((member) => (
                 <option key={member.id} value={member.id}>
-                  {member.name} ({member.role})
+                  {member.name}
                 </option>
               ))}
             </select>

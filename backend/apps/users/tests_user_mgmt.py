@@ -11,7 +11,7 @@ class UserManagementTest(TestCase):
         self.role_view = UserRoleUpdateView.as_view()
         User.objects.delete()
 
-        # Seed an admin and two members
+        # Seed the sole terminal admin and two members
         self.admin = User(name="Admin User", email="admin@example.com", password="hash", role="admin")
         self.admin.save()
         self.member1 = User(name="Alice Member", email="alice@example.com", password="hash", role="member")
@@ -42,72 +42,36 @@ class UserManagementTest(TestCase):
         res = self.list_view(req)
         self.assertEqual(res.status_code, 403)
 
-    def test_admin_can_promote_member_to_admin(self):
+    def test_roles_cannot_be_modified(self):
         req = self.factory.patch(f"/api/users/{self.member1.id}/role/", {"role": "admin"}, format="json")
         force_authenticate(req, user=self.admin)
         res = self.role_view(req, user_id=str(self.member1.id))
-        self.assertEqual(res.status_code, 200)
-        self.assertEqual(res.data["user"]["role"], "admin")
-
-        self.member1.reload()
-        self.assertEqual(self.member1.role, "admin")
-        # Now multiple admins coexist!
-        self.assertEqual(User.objects(role="admin").count(), 2)
-
-    def test_admin_can_demote_admin_when_multiple_admins_exist(self):
-        # Promote member1 to admin first
-        self.member1.role = "admin"
-        self.member1.save()
-        self.assertEqual(User.objects(role="admin").count(), 2)
-
-        # Admin demotes member1
-        req = self.factory.patch(f"/api/users/{self.member1.id}/role/", {"role": "member"}, format="json")
-        force_authenticate(req, user=self.admin)
-        res = self.role_view(req, user_id=str(self.member1.id))
-        self.assertEqual(res.status_code, 200)
-        self.assertEqual(res.data["user"]["role"], "member")
-
-        self.member1.reload()
-        self.assertEqual(self.member1.role, "member")
-
-    def test_cannot_demote_last_remaining_admin(self):
-        self.assertEqual(User.objects(role="admin").count(), 1)
-        req = self.factory.patch(f"/api/users/{self.admin.id}/role/", {"role": "member"}, format="json")
-        force_authenticate(req, user=self.admin)
-        res = self.role_view(req, user_id=str(self.admin.id))
         self.assertEqual(res.status_code, 400)
-        self.assertIn("last remaining administrator", res.data["message"].lower())
-
-        self.admin.reload()
-        self.assertEqual(self.admin.role, "admin")
+        self.assertIn("not permitted", res.data["message"].lower())
 
     def test_admin_cannot_delete_self(self):
         req = self.factory.delete(f"/api/users/{self.admin.id}/")
         force_authenticate(req, user=self.admin)
         res = self.detail_view(req, user_id=str(self.admin.id))
         self.assertEqual(res.status_code, 400)
-        self.assertIn("cannot delete your own account", res.data["message"].lower())
 
-    def test_cannot_delete_last_remaining_admin(self):
-        # Even if another request somehow targets the only admin
-        self.assertEqual(User.objects(role="admin").count(), 1)
-        # Create second admin so admin can target admin2
-        admin2 = User(name="Admin 2", email="admin2@example.com", password="hash", role="admin")
-        admin2.save()
-        self.assertEqual(User.objects(role="admin").count(), 2)
-
-        # Admin deletes admin2 - should succeed because total_admins was 2
-        req = self.factory.delete(f"/api/users/{admin2.id}/")
+    def test_admin_account_cannot_be_deleted(self):
+        # Attempt to delete the administrator account
+        req = self.factory.delete(f"/api/users/{self.admin.id}/")
         force_authenticate(req, user=self.admin)
-        res = self.detail_view(req, user_id=str(admin2.id))
-        self.assertEqual(res.status_code, 200)
-        self.assertEqual(User.objects(role="admin").count(), 1)
+        res = self.detail_view(req, user_id=str(self.admin.id))
+        self.assertEqual(res.status_code, 400)
+        self.assertTrue(
+            "cannot be deleted" in res.data["message"].lower()
+            or "own account" in res.data["message"].lower()
+        )
 
-    def test_member_cannot_promote_or_demote_roles(self):
-        req = self.factory.patch(f"/api/users/{self.member1.id}/role/", {"role": "admin"}, format="json")
-        force_authenticate(req, user=self.member1)
-        res = self.role_view(req, user_id=str(self.member1.id))
-        self.assertEqual(res.status_code, 403)
+    def test_admin_can_delete_member(self):
+        req = self.factory.delete(f"/api/users/{self.member2.id}/")
+        force_authenticate(req, user=self.admin)
+        res = self.detail_view(req, user_id=str(self.member2.id))
+        self.assertEqual(res.status_code, 200)
+        self.assertIsNone(User.objects(id=self.member2.id).first())
 
     def test_member_cannot_delete_users(self):
         req = self.factory.delete(f"/api/users/{self.member2.id}/")

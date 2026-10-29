@@ -88,6 +88,11 @@ class TeamTaskListCreateView(APIView):
                     {"message": "Assigned user must be a team member"},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
+            if assigned_user.role == "admin":
+                return Response(
+                    {"message": "Tasks can only be assigned to members, not the administrator"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
         now = datetime.utcnow()
         task = Task(
@@ -188,6 +193,11 @@ class TaskDetailView(APIView):
                 if not assigned_user or not is_member:
                     return Response(
                         {"message": "Assigned user must be a team member"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                if assigned_user.role == "admin":
+                    return Response(
+                        {"message": "Tasks can only be assigned to members, not the administrator"},
                         status=status.HTTP_400_BAD_REQUEST,
                     )
                 task.assigned_to = assigned_user

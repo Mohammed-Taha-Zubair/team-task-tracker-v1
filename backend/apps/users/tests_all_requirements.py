@@ -23,8 +23,8 @@ from apps.tasks.models import Task
 
 class AllTwelveRequirementsTestCase(TestCase):
     """
-    Consolidated automated test suite validating all 12 security
-    and role management requirements outlined in the task specification.
+    Consolidated automated test suite validating security, role rules,
+    and single terminal-created admin architecture.
     """
 
     def setUp(self):
@@ -146,39 +146,40 @@ class AllTwelveRequirementsTestCase(TestCase):
         self.assertIn("already configured", out2.getvalue().lower())
 
     # -------------------------------------------------------------------------
-    # Requirement 6: Admin can promote a Member
+    # Requirement 6: Role promotion is disabled (Single terminal admin)
     # -------------------------------------------------------------------------
-    def test_req_06_admin_can_promote_member(self):
+    def test_req_06_role_promotion_disabled(self):
         admin = User(name="Admin", email="admin@test.com", password="hash", role="admin").save()
         member = User(name="Member", email="member@test.com", password="hash", role="member").save()
 
         req = self.factory.patch(f"/api/users/{member.id}/role/", {"role": "admin"})
         force_authenticate(req, user=admin)
         res = self.user_role_view(req, user_id=str(member.id))
-        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("not permitted", res.data.get("message", "").lower())
 
         member.reload()
-        self.assertEqual(member.role, "admin")
+        self.assertEqual(member.role, "member")
 
     # -------------------------------------------------------------------------
-    # Requirement 7: Admin can demote another Admin
+    # Requirement 7: Role demotion is disabled (Single terminal admin)
     # -------------------------------------------------------------------------
-    def test_req_07_admin_can_demote_another_admin(self):
-        admin1 = User(name="Admin 1", email="a1@test.com", password="hash", role="admin").save()
-        admin2 = User(name="Admin 2", email="a2@test.com", password="hash", role="admin").save()
+    def test_req_07_role_demotion_disabled(self):
+        admin = User(name="Admin", email="admin@test.com", password="hash", role="admin").save()
 
-        req = self.factory.patch(f"/api/users/{admin2.id}/role/", {"role": "member"})
-        force_authenticate(req, user=admin1)
-        res = self.user_role_view(req, user_id=str(admin2.id))
-        self.assertEqual(res.status_code, 200)
+        req = self.factory.patch(f"/api/users/{admin.id}/role/", {"role": "member"})
+        force_authenticate(req, user=admin)
+        res = self.user_role_view(req, user_id=str(admin.id))
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("not permitted", res.data.get("message", "").lower())
 
-        admin2.reload()
-        self.assertEqual(admin2.role, "member")
+        admin.reload()
+        self.assertEqual(admin.role, "admin")
 
     # -------------------------------------------------------------------------
-    # Requirement 8: Member cannot promote themselves
+    # Requirement 8: Member cannot promote themselves or modify roles
     # -------------------------------------------------------------------------
-    def test_req_08_member_cannot_promote_themselves(self):
+    def test_req_08_member_cannot_modify_roles(self):
         member = User(name="Member", email="member@test.com", password="hash", role="member").save()
 
         req = self.factory.patch(f"/api/users/{member.id}/role/", {"role": "admin"})
@@ -216,51 +217,31 @@ class AllTwelveRequirementsTestCase(TestCase):
         self.assertEqual(res_del.status_code, 403)
 
     # -------------------------------------------------------------------------
-    # Requirement 10: Last Admin cannot accidentally be removed or demoted
+    # Requirement 10: Admin account cannot be deleted
     # -------------------------------------------------------------------------
-    def test_req_10_last_admin_cannot_be_demoted_or_deleted(self):
+    def test_req_10_admin_cannot_be_deleted(self):
         admin = User(name="Sole Admin", email="sole@test.com", password="hash", role="admin").save()
 
-        # Attempt to demote sole admin
-        req_demote = self.factory.patch(f"/api/users/{admin.id}/role/", {"role": "member"})
-        force_authenticate(req_demote, user=admin)
-        res_demote = self.user_role_view(req_demote, user_id=str(admin.id))
-        self.assertEqual(res_demote.status_code, 400)
-        self.assertIn("last remaining administrator", res_demote.data.get("message", "").lower())
-        admin.reload()
-        self.assertEqual(admin.role, "admin")
-
-        # Attempt to delete sole admin
         req_del = self.factory.delete(f"/api/users/{admin.id}/")
         force_authenticate(req_del, user=admin)
         res_del = self.user_detail_view(req_del, user_id=str(admin.id))
         self.assertEqual(res_del.status_code, 400)
-        self.assertTrue(
-            "last remaining administrator" in res_del.data.get("message", "").lower()
-            or "own account" in res_del.data.get("message", "").lower()
-        )
         self.assertIsNotNone(User.objects(id=admin.id).first())
 
     # -------------------------------------------------------------------------
-    # Requirement 11: Multiple Admin accounts can exist
+    # Requirement 11: Exactly one Admin created via terminal
     # -------------------------------------------------------------------------
-    def test_req_11_multiple_admin_accounts_can_exist(self):
-        admin1 = User(name="Admin 1", email="a1@test.com", password="hash", role="admin").save()
-        admin2 = User(name="Admin 2", email="a2@test.com", password="hash", role="admin").save()
-        admin3 = User(name="Admin 3", email="a3@test.com", password="hash", role="admin").save()
+    def test_req_11_only_one_terminal_admin(self):
+        User(name="Admin", email="admin@test.com", password="hash", role="admin").save()
 
-        admins = User.objects(role="admin")
-        self.assertEqual(admins.count(), 3)
-
-        # Any of them can authenticate and perform admin actions
-        req = self.factory.get("/api/users/")
-        force_authenticate(req, user=admin2)
-        res = self.user_list_view(req)
-        self.assertEqual(res.status_code, 200)
-        self.assertEqual(len(res.data.get("users", [])), 3)
+        # Second admin creation via management command is rejected
+        out = StringIO()
+        call_command("create_admin", name="Admin2", email="admin2@test.com", password="Pass", stdout=out)
+        self.assertIn("already configured", out.getvalue().lower())
+        self.assertEqual(User.objects(role="admin").count(), 1)
 
     # -------------------------------------------------------------------------
-    # Requirement 12: Team and task permissions continue working correctly
+    # Requirement 12: Team and task permissions enforced & Admin cannot be assigned tasks
     # -------------------------------------------------------------------------
     def test_req_12_team_and_task_permissions_enforced(self):
         admin = User(name="Admin", email="admin@test.com", password="hash", role="admin").save()
@@ -295,11 +276,15 @@ class AllTwelveRequirementsTestCase(TestCase):
         force_authenticate(req_inv2, user=admin)
         self.team_invite_view(req_inv2, id=team_id)
 
-        # Member cannot invite users
-        req_inv3 = self.factory.post(f"/api/teams/{team_id}/invite/", {"email": "stranger@test.com"})
-        force_authenticate(req_inv3, user=member_assigned)
-        inv_res = self.team_invite_view(req_inv3, id=team_id)
-        self.assertEqual(inv_res.status_code, 403)
+        # Admin CANNOT be assigned a task
+        req_admin_task = self.factory.post(f"/api/teams/{team_id}/tasks/", {
+            "title": "Admin Task",
+            "assigned_to": str(admin.id),
+        })
+        force_authenticate(req_admin_task, user=admin)
+        res_admin_task = self.task_list_view(req_admin_task, id=team_id)
+        self.assertEqual(res_admin_task.status_code, 400)
+        self.assertIn("members, not the administrator", res_admin_task.data.get("message", "").lower())
 
         # Admin creates task assigned to member_assigned
         req_task = self.factory.post(f"/api/teams/{team_id}/tasks/", {

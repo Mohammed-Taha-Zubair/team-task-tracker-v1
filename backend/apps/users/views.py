@@ -179,23 +179,18 @@ class UserListCreateView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        if role not in ["admin", "member"]:
-            return Response(
-                {"message": "Role must be 'admin' or 'member'"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
         if User.objects(email=email).first():
             return Response(
                 {"message": "A user with this email already exists"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        # All created users are members; the sole admin is provisioned via the terminal
         user = User(
             name=name,
             email=email,
             password=make_password(password),
-            role=role,
+            role="member",
         )
         user.save()
 
@@ -217,34 +212,10 @@ class UserRoleUpdateView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        new_role = request.data.get("role", "").strip().lower()
-        if new_role not in ["admin", "member"]:
-            return Response(
-                {"message": "Role must be 'admin' or 'member'"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        current_role = (user.role or "member").lower()
-
-        # If demoting from admin to member, check that this is not the last remaining admin
-        if current_role == "admin" and new_role == "member":
-            admin_count = User.objects(role="admin").count()
-            if admin_count <= 1:
-                return Response(
-                    {"message": "Cannot demote the last remaining administrator."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-        user.role = new_role
-        user.save()
-
-        action = "promoted to Admin" if new_role == "admin" else "demoted to Member"
+        # Role modification is completely disabled: only 1 terminal-created admin, all others are members
         return Response(
-            {
-                "message": f"User {user.name} {action} successfully",
-                "user": user.to_dict(),
-            },
-            status=status.HTTP_200_OK,
+            {"message": "Role modification is not permitted. Exactly one administrator account exists, created via terminal."},
+            status=status.HTTP_400_BAD_REQUEST,
         )
 
 
@@ -266,14 +237,12 @@ class UserDetailView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        # Protect the last remaining admin from deletion
-        if (user.role or "").lower() == "admin":
-            admin_count = User.objects(role="admin").count()
-            if admin_count <= 1:
-                return Response(
-                    {"message": "Cannot delete the last remaining administrator."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
+        # Protect the administrator account from deletion
+        if user.role == "admin":
+            return Response(
+                {"message": "The administrator account cannot be deleted"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         user.delete()
         return Response({"message": "User deleted successfully"}, status=status.HTTP_200_OK)
@@ -292,20 +261,11 @@ class UserDetailView(APIView):
         password = request.data.get("password", "")
         role = request.data.get("role", "").strip().lower()
 
-        if role:
-            if role not in ["admin", "member"]:
-                return Response(
-                    {"message": "Role must be 'admin' or 'member'"},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-            if (user.role or "").lower() == "admin" and role == "member":
-                admin_count = User.objects(role="admin").count()
-                if admin_count <= 1:
-                    return Response(
-                        {"message": "Cannot demote the last remaining administrator."},
-                        status=status.HTTP_400_BAD_REQUEST,
-                    )
-            user.role = role
+        if "role" in request.data:
+            return Response(
+                {"message": "Role modification is not permitted"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         if name:
             user.name = name

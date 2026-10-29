@@ -3,17 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { api } from "@/lib/api";
 
-/**
- * UserManagement — Admin-only panel for managing system users and roles.
- *
- * Features:
- *  - List all users with their role badges (ADMIN / MEMBER)
- *  - Search users by name or email
- *  - Promote Member to Admin (with confirmation)
- *  - Demote Admin to Member (with confirmation & last-admin protection)
- *  - Delete user accounts (with confirmation & last-admin / self protection)
- *  - Create new users directly (Admin or Member)
- */
+
 export default function UserManagement({ currentUserId }) {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -21,15 +11,14 @@ export default function UserManagement({ currentUserId }) {
   const [successMsg, setSuccessMsg] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Create-user form state
+  // Create-member form state
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ name: "", email: "", password: "", role: "member" });
+  const [form, setForm] = useState({ name: "", email: "", password: "" });
   const [formError, setFormError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  // Action in-flight states
+  // Deletion in-flight state
   const [deletingId, setDeletingId] = useState(null);
-  const [updatingRoleId, setUpdatingRoleId] = useState(null);
 
   const fetchUsers = useCallback(async (query = "") => {
     try {
@@ -69,34 +58,14 @@ export default function UserManagement({ currentUserId }) {
     try {
       const createdName = form.name;
       await api.post("/api/users/", form);
-      setForm({ name: "", email: "", password: "", role: "member" });
+      setForm({ name: "", email: "", password: "" });
       setShowForm(false);
-      flash(`User "${createdName}" created successfully`);
+      flash(`Member "${createdName}" created successfully`);
       await fetchUsers(searchQuery);
     } catch (err) {
       setFormError(err?.message || "Failed to create user");
     } finally {
       setSubmitting(false);
-    }
-  };
-
-  const handleRoleChange = async (userId, userName, currentRole, newRole) => {
-    const actionLabel = newRole === "admin" ? "promote" : "demote";
-    const confirmed = window.confirm(
-      `Are you sure you want to ${actionLabel} "${userName}" to ${newRole.toUpperCase()}?`
-    );
-    if (!confirmed) return;
-
-    setUpdatingRoleId(userId);
-    setError("");
-    try {
-      const res = await api.patch(`/api/users/${userId}/role/`, { role: newRole });
-      flash(res.message || `User "${userName}" updated to ${newRole.toUpperCase()}`);
-      await fetchUsers(searchQuery);
-    } catch (err) {
-      setError(err?.message || `Failed to ${actionLabel} user`);
-    } finally {
-      setUpdatingRoleId(null);
     }
   };
 
@@ -133,19 +102,19 @@ export default function UserManagement({ currentUserId }) {
             <span>User Management</span>
           </h2>
           <p className="text-xs text-slate-500 mt-0.5 ml-8">
-            Manage registered accounts, search users, and promote or demote administrator roles.
+            View registered team members and manage accounts.
           </p>
         </div>
         <div className="flex items-center space-x-2">
           <button
             id="add-user-btn"
             onClick={() => { setShowForm(!showForm); setFormError(""); }}
-            className="flex items-center space-x-1.5 text-xs px-3.5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium shadow-xs transition"
+            className="flex items-center space-x-1.5 text-xs px-3.5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium shadow-xs transition cursor-pointer"
           >
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
             </svg>
-            <span>{showForm ? "Cancel" : "Add User"}</span>
+            <span>{showForm ? "Cancel" : "Add Member"}</span>
           </button>
         </div>
       </div>
@@ -169,7 +138,7 @@ export default function UserManagement({ currentUserId }) {
             </svg>
             <span>{error}</span>
           </div>
-          <button onClick={() => setError("")} className="text-red-500 hover:text-red-700 font-bold text-xs ml-4">
+          <button onClick={() => setError("")} className="text-red-500 hover:text-red-700 font-bold text-xs ml-4 cursor-pointer">
             Dismiss
           </button>
         </div>
@@ -181,13 +150,13 @@ export default function UserManagement({ currentUserId }) {
           onSubmit={handleCreate}
           className="mb-6 p-5 bg-purple-50 border border-purple-200/70 rounded-xl space-y-3"
         >
-          <h3 className="text-sm font-semibold text-purple-900 mb-1">New User Details</h3>
+          <h3 className="text-sm font-semibold text-purple-900 mb-1">New Member Account</h3>
           {formError && (
             <div className="p-2.5 bg-red-50 border border-red-200 text-red-700 rounded-lg text-xs font-medium">
               {formError}
             </div>
           )}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Full Name</label>
               <input
@@ -214,7 +183,7 @@ export default function UserManagement({ currentUserId }) {
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Password <span className="font-normal text-slate-400">(shared with user)</span>
+                Password <span className="font-normal text-slate-400">(shared with member)</span>
               </label>
               <input
                 id="new-user-password"
@@ -222,21 +191,9 @@ export default function UserManagement({ currentUserId }) {
                 required
                 value={form.password}
                 onChange={(e) => setForm({ ...form, password: e.target.value })}
-                placeholder="Temporary password"
+                placeholder="Set password"
                 className="w-full px-3 py-2 bg-white text-slate-900 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 transition placeholder:text-slate-400"
               />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Initial Role</label>
-              <select
-                id="new-user-role"
-                value={form.role}
-                onChange={(e) => setForm({ ...form, role: e.target.value })}
-                className="w-full px-3 py-2 bg-white text-slate-900 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 transition"
-              >
-                <option value="member">Member</option>
-                <option value="admin">Admin</option>
-              </select>
             </div>
           </div>
           <div className="flex justify-end pt-1">
@@ -246,7 +203,7 @@ export default function UserManagement({ currentUserId }) {
               disabled={submitting}
               className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold rounded-lg shadow-xs transition disabled:opacity-50 cursor-pointer"
             >
-              {submitting ? "Creating..." : "Create User"}
+              {submitting ? "Creating..." : "Create Member"}
             </button>
           </div>
         </form>
@@ -271,7 +228,7 @@ export default function UserManagement({ currentUserId }) {
           {searchQuery && (
             <button
               onClick={() => setSearchQuery("")}
-              className="absolute inset-y-0 right-0 pr-3 flex items-center text-xs text-slate-400 hover:text-slate-600"
+              className="absolute inset-y-0 right-0 pr-3 flex items-center text-xs text-slate-400 hover:text-slate-600 cursor-pointer"
             >
               Clear
             </button>
@@ -302,19 +259,16 @@ export default function UserManagement({ currentUserId }) {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {users.map((u) => {
-                  const roleNormalized = String(u.role || "").toLowerCase();
-                  const isAdmin = roleNormalized.includes("admin");
+                  const isAdmin = u.role === "admin";
                   const isSelf = u.id === currentUserId;
-                  const isUpdatingThisUser = updatingRoleId === u.id;
                   const isDeletingThisUser = deletingId === u.id;
 
                   return (
                     <tr key={u.id} className="hover:bg-slate-50/60 transition">
                       <td className="px-4 py-3">
                         <div className="flex items-center space-x-2.5">
-                          <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold shrink-0 ${
-                            isAdmin ? "bg-purple-100 text-purple-700" : "bg-indigo-100 text-indigo-700"
-                          }`}>
+                          <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold shrink-0 ${isAdmin ? "bg-purple-100 text-purple-700" : "bg-indigo-100 text-indigo-700"
+                            }`}>
                             {u.name?.charAt(0)?.toUpperCase() || "U"}
                           </div>
                           <span className="font-medium text-slate-800 text-xs">
@@ -328,59 +282,33 @@ export default function UserManagement({ currentUserId }) {
                       <td className="px-4 py-3 text-xs text-slate-500">{u.email}</td>
                       <td className="px-4 py-3">
                         <span
-                          className={`text-[11px] px-2.5 py-0.5 rounded-full font-semibold uppercase tracking-wider border ${
-                            isAdmin
+                          className={`text-[11px] px-2.5 py-0.5 rounded-full font-semibold uppercase tracking-wider border ${isAdmin
                               ? "bg-purple-50 text-purple-700 border-purple-200/70"
                               : "bg-slate-100 text-slate-600 border-slate-200/70"
-                          }`}
+                            }`}
                         >
-                          {isAdmin ? "Admin" : "Member"}
+                          {u.role}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <div className="flex items-center justify-end space-x-2">
-                          {/* Promote / Demote Button */}
-                          {isAdmin ? (
-                            <button
-                              id={`demote-user-${u.id}`}
-                              onClick={() => handleRoleChange(u.id, u.name, "admin", "member")}
-                              disabled={isUpdatingThisUser || isDeletingThisUser}
-                              className="text-xs px-2.5 py-1 rounded-md text-amber-700 hover:bg-amber-50 border border-amber-200/70 font-medium transition disabled:opacity-40 cursor-pointer"
-                              title={isSelf ? "Demote your own account" : "Demote to Member"}
-                            >
-                              {isUpdatingThisUser ? "Updating..." : "Demote to Member"}
-                            </button>
-                          ) : (
-                            <button
-                              id={`promote-user-${u.id}`}
-                              onClick={() => handleRoleChange(u.id, u.name, "member", "admin")}
-                              disabled={isUpdatingThisUser || isDeletingThisUser}
-                              className="text-xs px-2.5 py-1 rounded-md text-purple-700 hover:bg-purple-50 border border-purple-200/70 font-medium transition disabled:opacity-40 cursor-pointer"
-                              title="Promote to Admin"
-                            >
-                              {isUpdatingThisUser ? "Updating..." : "Promote to Admin"}
-                            </button>
-                          )}
-
-                          {/* Delete Button */}
-                          {isSelf ? (
-                            <span
-                              className="text-xs text-slate-300 px-2 py-1 select-none"
-                              title="You cannot delete your own account"
-                            >
-                              —
-                            </span>
-                          ) : (
-                            <button
-                              id={`delete-user-${u.id}`}
-                              onClick={() => handleDelete(u.id, u.name)}
-                              disabled={isDeletingThisUser || isUpdatingThisUser}
-                              className="text-xs px-2.5 py-1 rounded-md text-red-600 hover:bg-red-50 border border-transparent hover:border-red-200 font-medium transition disabled:opacity-40 cursor-pointer"
-                            >
-                              {isDeletingThisUser ? "Deleting..." : "Delete"}
-                            </button>
-                          )}
-                        </div>
+                        {/* Administrator account and self cannot be deleted */}
+                        {isAdmin || isSelf ? (
+                          <span
+                            className="text-xs text-slate-300 px-2.5 py-1 select-none"
+                            title={isAdmin ? "Administrator account cannot be deleted" : "Cannot delete yourself"}
+                          >
+                            —
+                          </span>
+                        ) : (
+                          <button
+                            id={`delete-user-${u.id}`}
+                            onClick={() => handleDelete(u.id, u.name)}
+                            disabled={isDeletingThisUser}
+                            className="text-xs px-2.5 py-1 rounded-md text-red-600 hover:bg-red-50 border border-transparent hover:border-red-200 font-medium transition disabled:opacity-40 cursor-pointer"
+                          >
+                            {isDeletingThisUser ? "Deleting..." : "Delete"}
+                          </button>
+                        )}
                       </td>
                     </tr>
                   );

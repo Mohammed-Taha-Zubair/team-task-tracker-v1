@@ -114,9 +114,9 @@ export default function NewTaskForm({ teamId, members = [], onTaskCreated }) {
                 className="w-full px-3.5 py-2.5 bg-white text-slate-900 border border-slate-300 rounded-lg text-sm shadow-2xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition"
               >
                 <option value="">Unassigned</option>
-                {members?.filter(Boolean).map((member) => (
+                {members?.filter((m) => m && m.role === "member").map((member) => (
                   <option key={member.id} value={member.id}>
-                    {member.name} ({member.role})
+                    {member.name}
                   </option>
                 ))}
               </select>

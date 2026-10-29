@@ -141,3 +141,15 @@ class RoleAndTaskPermissionsTest(TestCase):
         force_authenticate(req, user=self.admin)
         res = self.comments_view(req, id=str(self.task_m1.id))
         self.assertEqual(res.status_code, 201)
+
+    def test_admin_cannot_be_assigned_task(self):
+        req = self.factory.post(f"/api/teams/{self.team.id}/tasks/", {
+            "title": "Admin task",
+            "assigned_to": str(self.admin.id),
+            "status": "pending"
+        }, format="json")
+        force_authenticate(req, user=self.admin)
+        res = self.task_create_view(req, id=str(self.team.id))
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("members, not the administrator", res.data["message"].lower())
+
