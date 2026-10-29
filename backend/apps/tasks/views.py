@@ -161,6 +161,9 @@ class TaskDetailView(APIView):
 
         old_status = task.status
         status_changed = False
+        title_changed = False
+        desc_changed = False
+        assigned_changed = False
 
         if "title" in request.data:
             title = request.data.get("title", "").strip()
@@ -169,15 +172,23 @@ class TaskDetailView(APIView):
                     {"message": "Title cannot be empty"},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-            task.title = title
+            if title != task.title:
+                title_changed = True
+                task.title = title
 
         if "description" in request.data:
-            task.description = request.data.get("description", "").strip()
+            desc = request.data.get("description", "").strip()
+            if desc != (task.description or ""):
+                desc_changed = True
+                task.description = desc
 
         if "assigned_to" in request.data:
             assigned_to_id = request.data.get("assigned_to")
+            old_assigned_id = str(task.assigned_to.id) if task.assigned_to else ""
             if assigned_to_id in [None, ""]:
-                task.assigned_to = None
+                if old_assigned_id != "":
+                    assigned_changed = True
+                    task.assigned_to = None
             else:
                 if not ObjectId.is_valid(assigned_to_id):
                     return Response(
@@ -200,7 +211,9 @@ class TaskDetailView(APIView):
                         {"message": "Tasks can only be assigned to members, not the administrator"},
                         status=status.HTTP_400_BAD_REQUEST,
                     )
-                task.assigned_to = assigned_user
+                if old_assigned_id != str(assigned_user.id):
+                    assigned_changed = True
+                    task.assigned_to = assigned_user
 
         if "status" in request.data:
             new_status = request.data.get("status", "").strip().lower()
@@ -212,6 +225,10 @@ class TaskDetailView(APIView):
             if new_status != old_status:
                 status_changed = True
                 task.status = new_status
+
+        has_changes = title_changed or desc_changed or assigned_changed or status_changed
+        if not has_changes:
+            return Response(format_task(task), status=status.HTTP_200_OK)
 
         task.updated_at = datetime.utcnow()
         task.save()

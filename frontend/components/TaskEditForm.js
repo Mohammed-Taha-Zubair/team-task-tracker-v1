@@ -28,9 +28,21 @@ export default function TaskEditForm({ task, members = [], onTaskSaved }) {
   const canEditStatusOnly = !isAdmin && isAssignedToUser;
   const isReadOnly = !isAdmin && !isAssignedToUser;
 
+  const currentAssignedId = task?.assigned_to?.id || "";
+  const hasChanges = canEditStatusOnly
+    ? status !== (task?.status || "pending")
+    : title.trim() !== (task?.title || "") ||
+      description.trim() !== (task?.description || "") ||
+      status !== (task?.status || "pending") ||
+      assignedTo !== currentAssignedId;
+
   const handleSave = async (e) => {
     e.preventDefault();
     if (isReadOnly) return;
+    if (!hasChanges) {
+      setSaveMessage({ type: "info", text: "No changes to save." });
+      return;
+    }
 
     setSaving(true);
     setSaveMessage(null);
@@ -134,6 +146,8 @@ export default function TaskEditForm({ task, members = [], onTaskSaved }) {
           className={`mt-4 p-3 rounded-lg text-xs font-medium border ${
             saveMessage.type === "success"
               ? "bg-emerald-50 border-emerald-200 text-emerald-800"
+              : saveMessage.type === "info"
+              ? "bg-blue-50 border-blue-200 text-blue-800"
               : "bg-red-50 border-red-200 text-red-700"
           }`}
         >
@@ -226,8 +240,8 @@ export default function TaskEditForm({ task, members = [], onTaskSaved }) {
           <div className="flex justify-end pt-2">
             <button
               type="submit"
-              disabled={saving}
-              className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white text-xs font-semibold rounded-lg shadow-xs transition disabled:opacity-50 cursor-pointer"
+              disabled={saving || !hasChanges}
+              className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white text-xs font-semibold rounded-lg shadow-xs transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             >
               {saving
                 ? "Saving..."

@@ -100,22 +100,27 @@ class TeamInviteView(APIView):
             if m
         )
 
-        if not already_member:
-            team.members.append(invited_user)
-            team.save()
-
-            log_activity(
-                team=team,
-                user=request.user,
-                message=f'{request.user.name} added {invited_user.name} to team "{team.name}"',
+        if already_member:
+            return Response(
+                {"message": f"{invited_user.name} is already a member of this team."},
+                status=status.HTTP_400_BAD_REQUEST,
             )
+
+        team.members.append(invited_user)
+        team.save()
+
+        log_activity(
+            team=team,
+            user=request.user,
+            message=f'{request.user.name} added {invited_user.name} to team "{team.name}"',
+        )
 
         team_dict = team.to_dict()
         team_dict["member_count"] = len(team.members)
 
         return Response(
             {
-                "message": f"{invited_user.name} added to team",
+                "message": f"{invited_user.name} added to team successfully",
                 "team": team_dict,
             },
             status=status.HTTP_200_OK,

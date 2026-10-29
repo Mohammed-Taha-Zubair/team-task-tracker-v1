@@ -5,6 +5,7 @@ from apps.tasks.views import TeamTaskListCreateView, TaskDetailView, TaskComment
 from apps.users.models import User
 from apps.teams.models import Team
 from apps.tasks.models import Task
+from apps.activity.models import Activity
 
 class RoleAndTaskPermissionsTest(TestCase):
     def setUp(self):
@@ -15,6 +16,7 @@ class RoleAndTaskPermissionsTest(TestCase):
         self.task_detail_view = TaskDetailView.as_view()
         self.comments_view = TaskCommentsView.as_view()
 
+        Activity.objects.delete()
         Task.objects.delete()
         Team.objects.delete()
         User.objects.delete()
@@ -57,6 +59,7 @@ class RoleAndTaskPermissionsTest(TestCase):
         self.task_m2.save()
 
     def tearDown(self):
+        Activity.objects.delete()
         Task.objects.delete()
         Team.objects.delete()
         User.objects.delete()
@@ -152,4 +155,44 @@ class RoleAndTaskPermissionsTest(TestCase):
         res = self.task_create_view(req, id=str(self.team.id))
         self.assertEqual(res.status_code, 400)
         self.assertIn("members, not the administrator", res.data["message"].lower())
+
+    def test_cannot_invite_duplicate_team_member(self):
+        req = self.factory.post(f"/api/teams/{self.team.id}/invite/", {"email": self.member1.email}, format="json")
+        force_authenticate(req, user=self.admin)
+        res = self.invite_view(req, id=str(self.team.id))
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("already a member of this team", res.data["message"])
+
+    def test_task_save_without_changes_does_not_log_activity(self):
+        # Initial activity count for this task
+        initial_activity_count = Activity.objects(task=self.task_m1).count()
+
+        # Admin sends PATCH with identical data
+        req = self.factory.patch(f"/api/tasks/{self.task_m1.id}/", {
+            "title": self.task_m1.title,
+            "description": self.task_m1.description,
+            "status": self.task_m1.status,
+            "assigned_to": str(self.member1.id),
+        }, format="json")
+        force_authenticate(req, user=self.admin)
+        res = self.task_detail_view(req, id=str(self.task_m1.id))
+
+        self.assertEqual(res.status_code, 200)
+        # Should not produce any new Activity entry
+        new_activity_count = Activity.objects(task=self.task_m1).count()
+        self.assertEqual(new_activity_count, initial_activity_count)
+
+    def test_task_save_with_changes_logs_activity(self):
+        initial_activity_count = Activity.objects(task=self.task_m1).count()
+
+        # Admin sends PATCH with a changed title
+        req = self.factory.patch(f"/api/tasks/{self.task_m1.id}/", {
+            "title": "Updated Title for M1 Task",
+        }, format="json")
+        force_authenticate(req, user=self.admin)
+        res = self.task_detail_view(req, id=str(self.task_m1.id))
+
+        self.assertEqual(res.status_code, 200)
+        new_activity_count = Activity.objects(task=self.task_m1).count()
+        self.assertEqual(new_activity_count, initial_activity_count + 1)
 
