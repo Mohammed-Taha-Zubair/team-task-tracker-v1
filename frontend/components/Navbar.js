@@ -10,7 +10,7 @@ export default function Navbar() {
     return null;
   }
 
-  const role = (user.role || "").toUpperCase();
+  const isAdmin = user.role === "admin";
 
   return (
     <nav className="w-full bg-white border-b border-slate-200 sticky top-0 z-50">
@@ -39,12 +39,12 @@ export default function Navbar() {
               </span>
               <span
                 className={`text-[11px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider border ${
-                  role === "ADMIN"
+                  isAdmin
                     ? "bg-purple-50 text-purple-700 border-purple-200"
                     : "bg-slate-100 text-slate-700 border-slate-200"
                 }`}
               >
-                {role || "MEMBER"}
+                {user.role}
               </span>
             </div>
 

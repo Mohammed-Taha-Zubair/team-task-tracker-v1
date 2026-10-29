@@ -13,7 +13,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         # Check if an admin already exists in the system
-        existing_admin = User.objects(role__in=["admin", "ADMIN"]).first()
+        existing_admin = User.objects(role="admin").first()
         if existing_admin:
             self.stdout.write(
                 self.style.WARNING(

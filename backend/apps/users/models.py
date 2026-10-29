@@ -10,7 +10,7 @@ from mongoengine import (
 class User(Document):
     meta = {"collection": "users"}
 
-    ROLE_CHOICES = ("admin", "member", "ADMIN", "MEMBER")
+    ROLE_CHOICES = ("admin", "member")
 
     name = StringField(required=True, max_length=100)
     email = EmailField(required=True, unique=True)
