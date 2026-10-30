@@ -4,8 +4,6 @@ from apps.users.views import (
     LoginView,
     RefreshView,
     MeView,
-    UserListCreateView,
-    UserDetailView,
 )
 
 urlpatterns = [
