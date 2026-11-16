@@ -25,16 +25,14 @@ source venv/bin/activate    # On Windows: venv\Scripts\activate
 # Install dependencies
 pip install -r requirements.txt
 
-# Create .env file with required settings
-cat <<EOF > .env
-SECRET_KEY=django-insecure-secret-key-change-in-production
-DEBUG=True
-ALLOWED_HOSTS=localhost,127.0.0.1
-MONGODB_NAME=team_task_tracker
-MONGODB_HOST=mongodb://localhost:27017/team_task_tracker
-JWT_SECRET=access-token-secret-change-in-production
-JWT_REFRESH_SECRET=refresh-token-secret-change-in-production
-EOF
+# Configure environment variables
+cp .env.example .env
+
+# (Optional) Verify configuration with tests
+python manage.py test
+
+# (Optional) Create an initial admin user
+python manage.py create_admin
 
 # Start the Django development server
 python manage.py runserver 8000
@@ -52,8 +50,8 @@ cd frontend
 # Install dependencies
 npm install
 
-# Create .env.local file
-echo "NEXT_PUBLIC_API_URL=http://localhost:8000" > .env.local
+# Configure environment variables
+cp .env.local.example .env.local
 
 # Start Next.js development server
 npm run dev
@@ -112,7 +110,7 @@ The application will be accessible at `http://localhost:3000`.
 ## Authentication: JWT Access & Refresh Tokens
 
 1. **Tokens**:
-   - **Access Token**: Short-lived (15 minutes), signed with `JWT_SECRET`. Stored strictly **in memory** on the client (`inMemoryAccessToken`) to prevent XSS exposure.
+   - **Access Token**: Short-lived (15 minutes), signed with `JWT_ACCESS_SECRET`. Stored strictly **in memory** on the client (`inMemoryAccessToken`) to prevent XSS exposure.
    - **Refresh Token**: Long-lived (7 days), signed with a separate `JWT_REFRESH_SECRET`. Stored in client `localStorage`.
 2. **Fetch Interceptor (`frontend/lib/api.js`)**:
    - Automatically attaches `Authorization: Bearer <accessToken>` to API requests.
